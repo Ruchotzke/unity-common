@@ -1,0 +1,12 @@
+{
+    "name": "net.ethanr.utilities",
+    "version": "2.0.0",
+    "displayName": "ethanr.net Unity utilities",
+    "description": "A set of utilities to make game design easier.",
+    "unity": "6000.0",
+    "author": {
+      "name": "ethanr",
+      "email": "",
+      "url": "https://ethanr.net"
+    }
+  }
