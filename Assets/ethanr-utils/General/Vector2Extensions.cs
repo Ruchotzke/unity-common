@@ -52,5 +52,37 @@ namespace UnityUtilities.General
         {
             return new Vertex(vector2.x, vector2.y);
         }
+
+        /// <summary>
+        /// Compute the absolute value of each component in this vector
+        /// </summary>
+        /// <param name="v2"></param>
+        /// <returns></returns>
+        public static Vector2 Abs(this Vector2 v2)
+        {
+            return new Vector2(Mathf.Abs(v2.x), Mathf.Abs(v2.y));
+        }
+
+        /// <summary>
+        /// Component-wise maximum computation.
+        /// </summary>
+        /// <param name="v2"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public static Vector2 Max(this Vector2 v2, float value)
+        {
+            return new Vector2(Mathf.Max(v2.x, value), Mathf.Max(v2.y, value));
+        }
+
+        /// <summary>
+        /// Component-wise minimum computation.
+        /// </summary>
+        /// <param name="v2"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public static Vector2 Min(this Vector2 v2, float value)
+        {
+            return new Vector2(Mathf.Min(v2.x, value), Mathf.Min(v2.y, value));
+        }
     }
 }
