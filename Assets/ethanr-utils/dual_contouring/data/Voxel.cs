@@ -20,5 +20,10 @@ namespace ethanr_utils.dual_contouring.data
             Material = material;
             SampleValue = sampleValue;
         }
+
+        public override string ToString()
+        {
+            return $"VOXEL[{SampleValue}]";
+        }
     }
 }

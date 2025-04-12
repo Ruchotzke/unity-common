@@ -46,7 +46,8 @@ namespace ethanr_utils.dual_contouring.sdf
                 for (int y = 0; y < chunk.Points.GetLength(1); y++)
                 {
                     var sample = chunk.VoxelToWorld(new Vector2Int(x, y));
-                    chunk.Points[x, y] = new Voxel(0, transform.Evaluate(this, sample));
+                    var eval = transform.Evaluate(this, sample);
+                    chunk.Points[x, y] = new Voxel(0, eval);
                 }
             }
         }

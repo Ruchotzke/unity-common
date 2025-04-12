@@ -27,7 +27,7 @@ namespace ethanr_utils.dual_contouring.data
         /// The edges within this chunk.
         /// Vector3 component represents a normal, and z component represents intersection point.
         /// </summary>
-        public Vector3[,] Edges;
+        public EdgeContainer Edges;
 
         /// <summary>
         /// The length of a given x or y edge.
@@ -45,35 +45,7 @@ namespace ethanr_utils.dual_contouring.data
             Area = area;
             EdgeSizes = new Vector2(area.width/(size.x-1), area.height/(size.y-1)); 
             Points = new Voxel[size.x, size.y];
-            Edges = new Vector3[size.x - 1, size.y - 1];
-        }
-
-        /// <summary>
-        /// Generate a deep copy of this chunk.
-        /// </summary>
-        /// <returns></returns>
-        public VolumeChunk Copy()
-        {
-            var copy = new VolumeChunk(Size, Area);
-            copy.Points = new Voxel[Points.GetLength(0), Points.GetLength(1)];
-            copy.Edges = new Vector3[Edges.GetLength(0), Edges.GetLength(1)];
-            for (int x = 0; x < Points.GetLength(0); x++)
-            {
-                for (int y = 0; y < Points.GetLength(1); y++)
-                {
-                    copy.Points[x, y] = Points[x, y];
-                }
-            }
-
-            for (int x = 0; x < Edges.GetLength(0); x++)
-            {
-                for (int y = 0; y < Edges.GetLength(1); y++)
-                {
-                    copy.Edges[x, y] = Edges[x, y];
-                }
-            }
-            
-            return copy;
+            Edges = new EdgeContainer();
         }
 
         /// <summary>
@@ -92,6 +64,15 @@ namespace ethanr_utils.dual_contouring.data
             
             /* Simply index */
             return Area.min + voxel * EdgeSizes;
+        }
+
+        /// <summary>
+        /// Convert a provided voxel coordinate into a world coordinate.
+        /// </summary>
+        /// <returns></returns>
+        public Vector2 VoxelToWorld(int x, int y)
+        {
+            return VoxelToWorld(new Vector2Int(x, y));
         }
 
         /// <summary>
