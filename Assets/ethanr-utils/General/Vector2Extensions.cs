@@ -27,6 +27,17 @@ namespace UnityUtilities.General
         }
 
         /// <summary>
+        /// Regular cast to vector3 with a provided z value.
+        /// </summary>
+        /// <param name="v2"></param>
+        /// <param name="z"></param>
+        /// <returns></returns>
+        public static Vector3 ToVector3WithZ(this Vector2 v2, float z)
+        {
+            return new Vector3(v2.x, v2.y, z);
+        }
+
+        /// <summary>
         /// Scale this vector2 by another vector2 element-wise.
         /// </summary>
         /// <param name="v2"></param>
