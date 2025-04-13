@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ethanr_utils.dual_contouring.data;
 using UnityEngine;
 
 namespace ethanr_utils.dual_contouring.computation
 {
+    /* SO USEFUL:::::https://www.boristhebrave.com/2018/04/15/dual-contouring-tutorial/ */
+    
     /// <summary>
     /// A set of functions used to generate mesh data from volumetric space
     /// using surface nets (non-normal preserving dual contouring).
@@ -228,11 +231,66 @@ namespace ethanr_utils.dual_contouring.computation
             
             /* SYNC POINT - All edges have been enumerated */
             /* GOAL: Put connected isosurfaces into their own polygons */
+            /* Step 1: Assemble surfaces as sets of connected edges */
+            var edgeMap = new Dictionary<Vector2, List<Vector2>>();
+            foreach (var edge in surface)
+            {
+                if(!edgeMap.ContainsKey(edge.a)) edgeMap.Add(edge.a, new List<Vector2>());
+                if(!edgeMap.ContainsKey(edge.b)) edgeMap.Add(edge.b, new List<Vector2>());
+                edgeMap[edge.a].Add(edge.b);
+                edgeMap[edge.b].Add(edge.a);
+            }
             
             /* SYNC POINT - All voxel data has been encoded into polygons */
             /* GOAL: Generate a mesh */
 
             return surface;
+        }
+
+        /// <summary>
+        /// Attempt to assemble a set of polygons from the provided map.
+        /// </summary>
+        /// <param name="edgeMap"></param>
+        /// <param name="polygons"></param>
+        /// <returns></returns>
+        private bool AssembleContours(Dictionary<Vector2, List<Vector2>> edgeMap, out List<List<Vector2>> polygons)
+        {
+            polygons = new List<List<Vector2>>();
+            var visited = new HashSet<Vector2>();
+            
+            /* Loop through each potential contour ring */
+            foreach (var start in edgeMap.Keys)
+            {
+                /* Don't start a new ring from a vertex that already was used elsewhere */
+                if (visited.Contains(start)) continue;
+
+                List<Vector2> loop = new();
+                Vector2 current = start;
+                Vector2? previous = null;
+
+                do
+                {
+                    /* Save this vertex into the current loop */
+                    loop.Add(current);
+                    visited.Add(current);
+
+                    /* Get the next neighbor */
+                    var neighbors = edgeMap[current];
+                    Vector2 next = neighbors.FirstOrDefault(n => n != previous);
+
+                    if (next == default)
+                        break; // dead end
+
+                    previous = current;
+                    current = next;
+
+                } while (current != start && !visited.Contains(current));
+
+                if (loop.Count > 2 && current == start)
+                {
+                    loops.Add(loop);
+                }
+            }
         }
 
         /// <summary>
