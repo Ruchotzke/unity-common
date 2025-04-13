@@ -149,8 +149,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   rotate: 1
-  position: {x: 0, y: 0}
-  rotation: 40
+  position: {x: 1.5, y: 2}
+  rotation: 5.6
   scale: 1
 --- !u!4 &43067942
 Transform:

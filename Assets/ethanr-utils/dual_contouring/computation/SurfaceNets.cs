@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ethanr_utils.dual_contouring.data;
+using Unity.VisualScripting;
 using UnityEngine;
 
 namespace ethanr_utils.dual_contouring.computation
@@ -19,10 +20,12 @@ namespace ethanr_utils.dual_contouring.computation
         /// </summary>
         /// <param name="chunk"></param>
         /// <returns></returns>
-        public static List<(Vector2 a, Vector2 b)> Generate(VolumeChunk chunk)
+        public static List<List<SurfacePoint>> Generate(VolumeChunk chunk)
         {
             /* SYNC POINT: Sampling data provided */
             /* GOAL: Compute all intersections and normals */
+
+            SurfacePoint.CURRENT_ID = 1;
             
             /* Start with right and up from source */
             for (int x = 0; x < chunk.Points.GetLength(0) - 1; x++)
@@ -65,7 +68,7 @@ namespace ethanr_utils.dual_contouring.computation
             
             /* SYNC POINT - All edge/intersection data computed */
             /* GOAL: Map voxels to singular edge point */
-            var surfacePoints = new Dictionary<Vector2Int, Vector2>(); // store all surface points computed
+            var surfacePoints = new Dictionary<Vector2Int, SurfacePoint>(); // store all surface points computed
             var surfaceEdges = new List<(Vector2Int a, Vector2Int b, EdgeContainer.EdgeDirection dir)>(); // store all edges the surface passes through
             
             /* For each voxel, we can compute one singular internal point */
@@ -116,7 +119,12 @@ namespace ethanr_utils.dual_contouring.computation
                             continue;
                         case 2:
                             /* Normal case - average */
-                            surfacePoints.Add(voxel, (isctPoints[0] + isctPoints[1]) * 0.5f);
+                            surfacePoints.Add(voxel, new SurfacePoint
+                            {
+                                Position = (isctPoints[0] + isctPoints[1]) * 0.5f,
+                                SurfaceID = 0,
+                                Adjacent = new List<SurfacePoint>()
+                            } );
                             break;
                         case 4:
                             /* Saddle point - weird */
@@ -131,9 +139,7 @@ namespace ethanr_utils.dual_contouring.computation
 
             /* SYNC POINT - All relevant voxels have a point */
             /* GOAL: Connect voxel points together into isosurface */
-            var surface = new List<(Vector2 a, Vector2 b)>();
-            List<Vector2> mapBoundaryPoints = new List<Vector2>(); //also save these to finish loops later
-
+            var mapBoundaryPoints = new List<SurfacePoint>(); //also save these to finish loops later
             
             /* Traverse all surface voxel edges (identified earlier) to find neighboring points */
             foreach (var voxelEdge in surfaceEdges)
@@ -153,9 +159,18 @@ namespace ethanr_utils.dual_contouring.computation
                             {
                                 Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
                             }
+                            
+                            /* Generate a new surface point */
+                            var edgePoint = new SurfacePoint()
+                            {
+                                Position = isct,
+                                SurfaceID = SurfacePoint.CURRENT_ID++,
+                                Adjacent = new List<SurfacePoint>()
+                            };
 
-                            surface.Add((isct, innerPoint));
-                            mapBoundaryPoints.Add(isct);
+                            mapBoundaryPoints.Add(edgePoint);
+                            edgePoint.Adjacent.Add(innerPoint);
+                            innerPoint.Adjacent.Add(edgePoint);
                         }
                         else
                         {
@@ -167,8 +182,17 @@ namespace ethanr_utils.dual_contouring.computation
                                 Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
                             }
 
-                            surface.Add((isct, innerPoint));
-                            mapBoundaryPoints.Add(isct);
+                            /* Generate a new surface point */
+                            var edgePoint = new SurfacePoint()
+                            {
+                                Position = isct,
+                                SurfaceID = SurfacePoint.CURRENT_ID++,
+                                Adjacent = new List<SurfacePoint>()
+                            };
+
+                            mapBoundaryPoints.Add(edgePoint);
+                            edgePoint.Adjacent.Add(innerPoint);
+                            innerPoint.Adjacent.Add(edgePoint);
                         }
                     }
                     else if (voxelEdge.dir == EdgeContainer.EdgeDirection.Right)
@@ -183,8 +207,17 @@ namespace ethanr_utils.dual_contouring.computation
                                 Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
                             }
 
-                            surface.Add((isct, innerPoint));
-                            mapBoundaryPoints.Add(isct);
+                            /* Generate a new surface point */
+                            var edgePoint = new SurfacePoint()
+                            {
+                                Position = isct,
+                                SurfaceID = SurfacePoint.CURRENT_ID++,
+                                Adjacent = new List<SurfacePoint>()
+                            };
+
+                            mapBoundaryPoints.Add(edgePoint);
+                            edgePoint.Adjacent.Add(innerPoint);
+                            innerPoint.Adjacent.Add(edgePoint);
                         }
                         else
                         {
@@ -196,8 +229,17 @@ namespace ethanr_utils.dual_contouring.computation
                                 Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
                             }
 
-                            surface.Add((innerPoint, isct));
-                            mapBoundaryPoints.Add(isct);
+                            /* Generate a new surface point */
+                            var edgePoint = new SurfacePoint()
+                            {
+                                Position = isct,
+                                SurfaceID = SurfacePoint.CURRENT_ID++,
+                                Adjacent = new List<SurfacePoint>()
+                            };
+
+                            mapBoundaryPoints.Add(edgePoint);
+                            edgePoint.Adjacent.Add(innerPoint);
+                            innerPoint.Adjacent.Add(edgePoint);
                         }
                     }
                     else
@@ -213,14 +255,16 @@ namespace ethanr_utils.dual_contouring.computation
                         var leftVoxel = voxelEdge.a + Vector2Int.left;
                         var a = surfacePoints[leftVoxel];
                         var b = surfacePoints[voxelEdge.a];
-                        surface.Add((a,b));
+                        a.Adjacent.Add(b);
+                        b.Adjacent.Add(a);
                     }
                     else if (voxelEdge.dir == EdgeContainer.EdgeDirection.Right)
                     {
                         var botVoxel = voxelEdge.a + Vector2Int.down;
                         var a = surfacePoints[botVoxel];
                         var b = surfacePoints[voxelEdge.a];
-                        surface.Add((a,b));
+                        a.Adjacent.Add(b);
+                        b.Adjacent.Add(a);
                     }
                     else
                     {
@@ -229,68 +273,114 @@ namespace ethanr_utils.dual_contouring.computation
                 }
             }
             
-            /* SYNC POINT - All edges have been enumerated */
+            /* Tag/fill in surface IDs of all points */
+            List<SurfacePoint> allSurfacePoints = new List<SurfacePoint>();
+            allSurfacePoints.AddRange(surfacePoints.Values);
+            allSurfacePoints.AddRange(mapBoundaryPoints);
+            FloodFillSurfaces(allSurfacePoints);
+            
+            /* SYNC POINT - All edges have been enumerated and points tagged */
             /* GOAL: Put connected isosurfaces into their own polygons */
-            /* Step 1: Assemble surfaces as sets of connected edges */
-            var edgeMap = new Dictionary<Vector2, List<Vector2>>();
-            foreach (var edge in surface)
-            {
-                if(!edgeMap.ContainsKey(edge.a)) edgeMap.Add(edge.a, new List<Vector2>());
-                if(!edgeMap.ContainsKey(edge.b)) edgeMap.Add(edge.b, new List<Vector2>());
-                edgeMap[edge.a].Add(edge.b);
-                edgeMap[edge.b].Add(edge.a);
-            }
+            var surfaces = GenerateSurfaces(allSurfacePoints);
             
             /* SYNC POINT - All voxel data has been encoded into polygons */
             /* GOAL: Generate a mesh */
 
-            return surface;
+            return surfaces;
+        }
+
+        private static List<List<SurfacePoint>> GenerateSurfaces(List<SurfacePoint> surfacePoints)
+        {
+            /* Each only belongs to one surface */
+            HashSet<SurfacePoint> open = new HashSet<SurfacePoint>();
+            open.AddRange(surfacePoints);
+            
+            var surfaces = new List<List<SurfacePoint>>();
+            uint id = 1;    
+            
+            while (open.Count > 0)
+            {
+                var currSurface = new List<SurfacePoint>();
+                foreach (var point in open)
+                {
+                    if (point.SurfaceID == id)
+                    {
+                        currSurface.Add(point);
+                    }
+                }
+                open.RemoveWhere(s => currSurface.Contains(s));
+                
+                surfaces.Add(currSurface);
+                if(open.Count > 0) id = open.First().SurfaceID;
+            }
+
+            return surfaces;
         }
 
         /// <summary>
-        /// Attempt to assemble a set of polygons from the provided map.
+        /// Flood fill surface identifiers to match surfaces across multiple points.
         /// </summary>
-        /// <param name="edgeMap"></param>
-        /// <param name="polygons"></param>
-        /// <returns></returns>
-        private bool AssembleContours(Dictionary<Vector2, List<Vector2>> edgeMap, out List<List<Vector2>> polygons)
+        /// <param name="surfacePoints"></param>
+        private static void FloodFillSurfaces(List<SurfacePoint> surfacePoints)
         {
-            polygons = new List<List<Vector2>>();
-            var visited = new HashSet<Vector2>();
+            /* No double reaching */
+            HashSet<SurfacePoint> open = new HashSet<SurfacePoint>();
+            open.AddRange(surfacePoints);
             
-            /* Loop through each potential contour ring */
-            foreach (var start in edgeMap.Keys)
+            /* Iterate until we find a starting point */
+            uint currID = 1;
+
+            while (open.Count > 0)
             {
-                /* Don't start a new ring from a vertex that already was used elsewhere */
-                if (visited.Contains(start)) continue;
-
-                List<Vector2> loop = new();
-                Vector2 current = start;
-                Vector2? previous = null;
-
-                do
+                /* Find this meshes starting point */
+                SurfacePoint start = null;
+                foreach (var point in open)
                 {
-                    /* Save this vertex into the current loop */
-                    loop.Add(current);
-                    visited.Add(current);
-
-                    /* Get the next neighbor */
-                    var neighbors = edgeMap[current];
-                    Vector2 next = neighbors.FirstOrDefault(n => n != previous);
-
-                    if (next == default)
-                        break; // dead end
-
-                    previous = current;
-                    current = next;
-
-                } while (current != start && !visited.Contains(current));
-
-                if (loop.Count > 2 && current == start)
-                {
-                    loops.Add(loop);
+                    if (point.SurfaceID == currID)
+                    {
+                        /* Found our starting point */
+                        start = point;
+                        break;
+                    }
                 }
+                
+                /* If we didn't find a starting point, there is only one submesh remaining! */
+                if (start == null)
+                {
+                    foreach (var point in open)
+                    {
+                        point.SurfaceID = currID;
+                    }
+
+                    Debug.Log($"FloodFill exiting early with {currID} surfaces.");
+                    return;
+                }
+                
+                /* Flood fill the current mesh */
+                Queue<SurfacePoint> queue = new Queue<SurfacePoint>();
+                queue.Enqueue(start);
+                open.Remove(start);
+
+                while (queue.Count > 0)
+                {
+                    var curr = queue.Dequeue();
+                    curr.SurfaceID = currID;
+
+                    foreach (var neighbor in curr.Adjacent)
+                    {
+                        if (open.Contains(neighbor))
+                        {
+                            open.Remove(neighbor);
+                            queue.Enqueue(neighbor);
+                        }
+                    }
+                }
+                
+                /* Move on to the next mesh */
+                currID++;
             }
+            
+            Debug.Log($"Finished flood filling mesh with {currID} surfaces.");
         }
 
         /// <summary>
