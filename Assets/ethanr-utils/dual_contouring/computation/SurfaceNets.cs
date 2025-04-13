@@ -32,16 +32,6 @@ namespace ethanr_utils.dual_contouring.computation
                         /* BL->BR */
                         chunk.Edges.SetEdge(new Vector2Int(x,y), EdgeContainer.EdgeDirection.Right, new Vector3(0.0f, 0.0f, t));
                     }
-                    // if (CheckIntersection(chunk.Points[x+1, y], chunk.Points[x + 1, y+1], out t))
-                    // {
-                    //     /* BR->TR */
-                    //     chunk.Edges.SetEdge(new Vector2Int(x+1, y), EdgeContainer.EdgeDirection.Up,  new Vector3(0.0f, 0.0f, t));
-                    // }
-                    // if (CheckIntersection(chunk.Points[x+1, y+1], chunk.Points[x, y+1], out t))
-                    // {
-                    //     /* TR->TL */
-                    //     chunk.Edges.SetEdge(new Vector2Int(x + 1, y+1), EdgeContainer.EdgeDirection.Left,  new Vector3(0.0f, 0.0f, t));
-                    // }
                     if (CheckIntersection(chunk.Points[x, y+1], chunk.Points[x, y], out t))
                     {
                         /* TL->BL */
@@ -72,7 +62,8 @@ namespace ethanr_utils.dual_contouring.computation
             
             /* SYNC POINT - All edge/intersection data computed */
             /* GOAL: Map voxels to singular edge point */
-            Dictionary<Vector2Int, Vector2> surfacePoints = new Dictionary<Vector2Int, Vector2>();
+            var surfacePoints = new Dictionary<Vector2Int, Vector2>(); // store all surface points computed
+            var surfaceEdges = new List<(Vector2Int a, Vector2Int b, EdgeContainer.EdgeDirection dir)>(); // store all edges the surface passes through
             
             /* For each voxel, we can compute one singular internal point */
             for (int x = 0; x < chunk.Points.GetLength(0) - 1; x++)
@@ -88,12 +79,14 @@ namespace ethanr_utils.dual_contouring.computation
                     {
                         /* BOTTOM */
                         isctPoints.Add(isct);
+                        surfaceEdges.Add((voxel, voxel + Vector2Int.right, EdgeContainer.EdgeDirection.Right));
                     }
 
                     if (chunk.Edges.TryGetEdgeIntersectionPoint(voxel, EdgeContainer.EdgeDirection.Up, chunk, out isct))
                     {
                         /* LEFT */
                         isctPoints.Add(isct);
+                        surfaceEdges.Add((voxel, voxel + Vector2Int.up, EdgeContainer.EdgeDirection.Up));
                     }
 
                     if (chunk.Edges.TryGetEdgeIntersectionPoint(voxel + Vector2Int.one,
@@ -101,6 +94,7 @@ namespace ethanr_utils.dual_contouring.computation
                     {
                         /* RIGHT */
                         isctPoints.Add(isct);
+                        surfaceEdges.Add((voxel + Vector2Int.right, voxel + Vector2Int.one, EdgeContainer.EdgeDirection.Up));
                     }
 
                     if (chunk.Edges.TryGetEdgeIntersectionPoint(voxel + Vector2Int.one,
@@ -108,6 +102,7 @@ namespace ethanr_utils.dual_contouring.computation
                     {
                         /* TOP */
                         isctPoints.Add(isct);
+                        surfaceEdges.Add((voxel + Vector2Int.up, voxel + Vector2Int.one, EdgeContainer.EdgeDirection.Right));
                     }
                     
                     /* Now, handle the voxel based on the number of intersection points */
@@ -134,59 +129,100 @@ namespace ethanr_utils.dual_contouring.computation
             /* SYNC POINT - All relevant voxels have a point */
             /* GOAL: Connect voxel points together into isosurface */
             var surface = new List<(Vector2 a, Vector2 b)>();
-            
-            /* Start by connecting voxels in the up/right direction */
-            foreach (var voxel in surfacePoints.Keys)
-            {
-                /* Get the corresponding surface point */
-                var point = surfacePoints[voxel];
-                
-                /* Attempt to connect to a neighbor or both */
-                if (surfacePoints.TryGetValue(new Vector2Int(voxel.x + 1, voxel.y), out Vector2 neighbor))
-                {
-                    surface.Add((point, neighbor));
-                }
-
-                if (surfacePoints.TryGetValue(new Vector2Int(voxel.x, voxel.y + 1), out neighbor))
-                {
-                    surface.Add((point, neighbor));
-                }
-            }
-            
-            /* We also need to make extra edges for the voxels along the edge (we want complete meshes) */
             List<Vector2> mapBoundaryPoints = new List<Vector2>(); //also save these to finish loops later
+
             
-            foreach (var voxel in surfacePoints.Keys)
+            /* Traverse all surface voxel edges (identified earlier) to find neighboring points */
+            foreach (var voxelEdge in surfaceEdges)
             {
-                /* We only want edges */
-                if (!(voxel.x == 0 || voxel.y == 0 || voxel.x == width - 1 || voxel.y == height - 1)) continue;
-                
-                /* Check for an edge intersection on the edge of the map */
-                if (voxel.x == 0 && chunk.Edges.TryGetEdgeIntersectionPoint(voxel, EdgeContainer.EdgeDirection.Up, chunk, out var isct))
+                /* If this is a border edge, handle it differently */
+                if (IsBorderEdge(voxelEdge, width, height))
                 {
-                    /* LEFT SIDE */
-                    mapBoundaryPoints.Add(isct);
-                    surface.Add((isct, surfacePoints[voxel]));
+                    /* Connect one voxel point to one border edge point */
+                    if (voxelEdge.dir == EdgeContainer.EdgeDirection.Up)
+                    {
+                        if (voxelEdge.a.x == 0)
+                        {
+                            /* Left border */
+                            var innerPoint = surfacePoints[voxelEdge.a];
+                            Vector2 isct;
+                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out isct))
+                            {
+                                Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
+                            }
+
+                            surface.Add((isct, innerPoint));
+                            mapBoundaryPoints.Add(isct);
+                        }
+                        else
+                        {
+                            /* Right border */
+                            var innerPoint = surfacePoints[voxelEdge.a + Vector2Int.left];
+                            Vector2 isct;
+                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out isct))
+                            {
+                                Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
+                            }
+
+                            surface.Add((isct, innerPoint));
+                            mapBoundaryPoints.Add(isct);
+                        }
+                    }
+                    else if (voxelEdge.dir == EdgeContainer.EdgeDirection.Right)
+                    {
+                        if (voxelEdge.a.y == 0)
+                        {
+                            /* Bottom border */
+                            var innerPoint = surfacePoints[voxelEdge.a];
+                            Vector2 isct;
+                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out isct))
+                            {
+                                Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
+                            }
+
+                            surface.Add((isct, innerPoint));
+                            mapBoundaryPoints.Add(isct);
+                        }
+                        else
+                        {
+                            /* Top border */
+                            var innerPoint = surfacePoints[voxelEdge.a + Vector2Int.down];
+                            Vector2 isct;
+                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out isct))
+                            {
+                                Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
+                            }
+
+                            surface.Add((innerPoint, isct));
+                            mapBoundaryPoints.Add(isct);
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogError($"Unable to process voxel with {voxelEdge.dir} inside...");
+                    }
                 }
-                if (voxel.y == 0 && chunk.Edges.TryGetEdgeIntersectionPoint(voxel, EdgeContainer.EdgeDirection.Right, chunk, out isct))
+                else
                 {
-                    /* BOTTOM SIDE */
-                    mapBoundaryPoints.Add(isct);
-                    surface.Add((isct, surfacePoints[voxel]));
-                }
-                if (voxel.x == width-2 && chunk.Edges.TryGetEdgeIntersectionPoint(voxel + Vector2Int.one,
-                             EdgeContainer.EdgeDirection.Down, chunk, out isct))
-                {
-                    /* RIGHT SIDE */
-                    mapBoundaryPoints.Add(isct);
-                    surface.Add((isct, surfacePoints[voxel]));
-                }
-                if (voxel.y == height-2 && chunk.Edges.TryGetEdgeIntersectionPoint(voxel + Vector2Int.one,
-                             EdgeContainer.EdgeDirection.Left, chunk, out isct))
-                {
-                    /* TOP SIDE */
-                    mapBoundaryPoints.Add(isct);
-                    surface.Add((isct, surfacePoints[voxel]));
+                    /* Connect two voxel points together */
+                    if (voxelEdge.dir == EdgeContainer.EdgeDirection.Up)
+                    {
+                        var leftVoxel = voxelEdge.a + Vector2Int.left;
+                        var a = surfacePoints[leftVoxel];
+                        var b = surfacePoints[voxelEdge.a];
+                        surface.Add((a,b));
+                    }
+                    else if (voxelEdge.dir == EdgeContainer.EdgeDirection.Right)
+                    {
+                        var botVoxel = voxelEdge.a + Vector2Int.down;
+                        var a = surfacePoints[botVoxel];
+                        var b = surfacePoints[voxelEdge.a];
+                        surface.Add((a,b));
+                    }
+                    else
+                    {
+                        Debug.LogError($"Unable to process voxel with {voxelEdge.dir} inside...");
+                    }
                 }
             }
             
@@ -197,6 +233,26 @@ namespace ethanr_utils.dual_contouring.computation
             /* GOAL: Generate a mesh */
 
             return surface;
+        }
+
+        /// <summary>
+        /// Determine if this edge is on the edge of the voxel space.
+        /// </summary>
+        /// <param name="edge"></param>
+        /// <returns></returns>
+        private static bool IsBorderEdge((Vector2Int a, Vector2Int b, EdgeContainer.EdgeDirection dir) edge, int width, int height)
+        {
+            if (edge.dir == EdgeContainer.EdgeDirection.Up)
+            { 
+                return (edge.a.x == 0 || edge.a.x == width - 1);
+            }
+            else if (edge.dir == EdgeContainer.EdgeDirection.Right)
+            {
+                return (edge.a.y == 0 || edge.a.y == height - 1);
+            }
+
+            Debug.LogError("Bad case encountered in IsBorderEdge.");
+            return false;
         }
 
         /// <summary>
@@ -228,7 +284,7 @@ namespace ethanr_utils.dual_contouring.computation
         /// <returns></returns>
         private static float ApproxLinearInterp(float aSample, float bSample)
         {
-            const int ITERATIONS = 5; // Can be adjusted for more/less accuracy
+            const int ITERATIONS = 8; // Can be adjusted for more/less accuracy
 
             if (aSample == 0)
             {

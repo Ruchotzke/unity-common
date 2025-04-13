@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using ethanr_utils.dual_contouring.computation;
 using ethanr_utils.dual_contouring.data;
 using ethanr_utils.dual_contouring.sdf;
@@ -23,12 +24,10 @@ namespace ethanr_utils.dual_contouring
         private void Awake()
         {
             /* Generate a volume filled with the SDF of a circle */
-            chunk = new VolumeChunk(new Vector2Int(8, 8), new Rect(0.0f, 0.0f, 4.0f, 4.0f));
+            chunk = new VolumeChunk(new Vector2Int(16, 16), new Rect(0.0f, 0.0f, 4.0f, 4.0f));
             evaluator = new RectEvaluator(new Vector2(3f, 1.5f)); 
             var trans = new TransformEvaluator(position, rotation, scale);
             evaluator.EvaluateAgainst(chunk, trans);
-            
-            Debug.Log($"{evaluator.SampleSDF(Vector2.zero)}");
         }
 
         private void Update()
@@ -36,12 +35,14 @@ namespace ethanr_utils.dual_contouring
             if (rotate)
             {
                 // rotation += 15 * Time.deltaTime;
-                chunk = new VolumeChunk(new Vector2Int(8, 8), new Rect(0.0f, 0.0f, 4.0f, 4.0f));
+                chunk = new VolumeChunk(new Vector2Int(16, 16), new Rect(0.0f, 0.0f, 4.0f, 4.0f));
                 var trans = new TransformEvaluator(position, rotation, scale);
                 evaluator.EvaluateAgainst(chunk, trans);
             }
         }
 
+        private List<(Vector2 a, Vector2 b)> edges;
+        
         private void OnDrawGizmos()
         {
             if (Application.isPlaying)
@@ -55,17 +56,22 @@ namespace ethanr_utils.dual_contouring
                             /* Underlying sample */
                             Gizmos.color = chunk.Points[x,y].SampleValue <= 0.0f ? Color.red : Color.black;
                             Gizmos.DrawSphere(chunk.VoxelToWorld(new Vector2Int(x, y)), 0.1f);
-                            
-                            /* Voxel */
-                            var edges = SurfaceNets.Generate(chunk);
-                            foreach (var edge in edges)
-                            {
-                                Gizmos.color = Color.green;
-                                Gizmos.DrawLine(edge.a.ToVector3WithZ(-0.05f), edge.b.ToVector3WithZ(-0.05f));
-                            }
                         }
                     }
                 }
+                
+                /* Voxel */
+                edges = SurfaceNets.Generate(chunk);
+                
+                if (edges != null)
+                {
+                    foreach (var edge in edges)
+                    {
+                        Gizmos.color = Color.green;
+                        Gizmos.DrawLine(edge.a.ToVector3WithZ(-0.05f), edge.b.ToVector3WithZ(-0.05f));
+                    }
+                }
+                
             }
         }
     }
