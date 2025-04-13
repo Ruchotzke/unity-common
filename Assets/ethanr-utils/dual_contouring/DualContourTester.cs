@@ -1,9 +1,7 @@
-using System;
 using System.Collections.Generic;
 using ethanr_utils.dual_contouring.computation;
 using ethanr_utils.dual_contouring.data;
 using ethanr_utils.dual_contouring.sdf;
-using UnityEditor;
 using UnityEngine;
 using UnityUtilities.General;
 using Random = UnityEngine.Random;

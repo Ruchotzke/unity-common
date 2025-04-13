@@ -32,7 +32,7 @@ namespace ethanr_utils.dual_contouring.data
         /// <summary>
         /// The length of a given x or y edge.
         /// </summary>
-        private Vector2 EdgeSizes;
+        private Vector2 edgeSizes;
 
         /// <summary>
         /// Construct a new, empty volume chunk.
@@ -43,7 +43,7 @@ namespace ethanr_utils.dual_contouring.data
         {
             Size = size;
             Area = area;
-            EdgeSizes = new Vector2(area.width/(size.x-1), area.height/(size.y-1)); 
+            edgeSizes = new Vector2(area.width/(size.x-1), area.height/(size.y-1)); 
             Points = new Voxel[size.x, size.y];
             Edges = new EdgeContainer();
         }
@@ -53,7 +53,6 @@ namespace ethanr_utils.dual_contouring.data
         /// </summary>
         /// <param name="voxel"></param>
         /// <returns></returns>
-        /// <exception cref="ArgumentException"></exception>
         public Vector2 VoxelToWorld(Vector2Int voxel)
         {
             /* First ensure the provided voxel is within bounds */
@@ -63,7 +62,7 @@ namespace ethanr_utils.dual_contouring.data
             }
             
             /* Simply index */
-            return Area.min + voxel * EdgeSizes;
+            return Area.min + voxel * edgeSizes;
         }
 
         /// <summary>

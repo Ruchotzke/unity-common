@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using ethanr_utils.dual_contouring.data;
@@ -13,7 +12,7 @@ namespace ethanr_utils.dual_contouring.computation
     /// A set of functions used to generate mesh data from volumetric space
     /// using surface nets (non-normal preserving dual contouring).
     /// </summary>
-    public class SurfaceNets
+    public static class SurfaceNets
     {
         /// <summary>
         /// Generate the surface.
@@ -154,8 +153,7 @@ namespace ethanr_utils.dual_contouring.computation
                         {
                             /* Left border */
                             var innerPoint = surfacePoints[voxelEdge.a];
-                            Vector2 isct;
-                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out isct))
+                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out var isct))
                             {
                                 Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
                             }
@@ -176,8 +174,7 @@ namespace ethanr_utils.dual_contouring.computation
                         {
                             /* Right border */
                             var innerPoint = surfacePoints[voxelEdge.a + Vector2Int.left];
-                            Vector2 isct;
-                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out isct))
+                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out var isct))
                             {
                                 Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
                             }
@@ -201,8 +198,7 @@ namespace ethanr_utils.dual_contouring.computation
                         {
                             /* Bottom border */
                             var innerPoint = surfacePoints[voxelEdge.a];
-                            Vector2 isct;
-                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out isct))
+                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out var isct))
                             {
                                 Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
                             }
@@ -223,8 +219,7 @@ namespace ethanr_utils.dual_contouring.computation
                         {
                             /* Top border */
                             var innerPoint = surfacePoints[voxelEdge.a + Vector2Int.down];
-                            Vector2 isct;
-                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out isct))
+                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out var isct))
                             {
                                 Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
                             }
@@ -387,6 +382,8 @@ namespace ethanr_utils.dual_contouring.computation
         /// Determine if this edge is on the edge of the voxel space.
         /// </summary>
         /// <param name="edge"></param>
+        /// <param name="width"></param>
+        /// <param name="height"></param>
         /// <returns></returns>
         private static bool IsBorderEdge((Vector2Int a, Vector2Int b, EdgeContainer.EdgeDirection dir) edge, int width, int height)
         {
@@ -409,6 +406,7 @@ namespace ethanr_utils.dual_contouring.computation
         /// </summary>
         /// <param name="a"></param>
         /// <param name="b"></param>
+        /// <param name="t"></param>
         /// <returns></returns>
         private static bool CheckIntersection(Voxel a, Voxel b, out float t)
         {
@@ -432,7 +430,7 @@ namespace ethanr_utils.dual_contouring.computation
         /// <returns></returns>
         private static float ApproxLinearInterp(float aSample, float bSample)
         {
-            const int ITERATIONS = 8; // Can be adjusted for more/less accuracy
+            const int iterations = 8; // Can be adjusted for more/less accuracy
 
             if (aSample == 0)
             {
@@ -450,7 +448,7 @@ namespace ethanr_utils.dual_contouring.computation
             }
             
             float t = 0.5f;
-            for (int i = 0; i < ITERATIONS; i++)
+            for (int i = 0; i < iterations; i++)
             {
                 var sample = Mathf.Lerp(aSample, bSample, t);
                 var delta = 1.0f / Mathf.Pow(2.0f, i + 1);
