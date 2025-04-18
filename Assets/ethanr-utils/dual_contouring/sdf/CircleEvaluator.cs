@@ -1,3 +1,4 @@
+using ethanr_utils.dual_contouring.csg_ops;
 using ethanr_utils.dual_contouring.data;
 using UnityEngine;
 
@@ -6,7 +7,7 @@ namespace ethanr_utils.dual_contouring.sdf
     /// <summary>
     /// The SDF evaluator for a circle.
     /// </summary>
-    public class CircleEvaluator : SdfEvaluator
+    public class CircleEvaluator : SdfOperator
     {
         
         /// <summary>
@@ -23,9 +24,15 @@ namespace ethanr_utils.dual_contouring.sdf
             Radius = radius;
         }
 
-        public override float SampleSDF(Vector2 point)
+        public override float SampleValue(Vector2 pos)
         {
-            return point.magnitude - Radius;
+            return pos.magnitude - Radius;
+        }
+
+        public override Vector2 SampleNormal(Vector2 pos)
+        {
+            /* We can compute this directly and easily */
+            return pos.normalized;
         }
     }
 }

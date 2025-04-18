@@ -3,6 +3,7 @@ using ethanr_utils.dual_contouring.computation;
 using ethanr_utils.dual_contouring.data;
 using ethanr_utils.dual_contouring.sdf;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityUtilities.General;
 using Random = UnityEngine.Random;
 
@@ -14,32 +15,33 @@ namespace ethanr_utils.dual_contouring
     public class DualContourTester : MonoBehaviour
     {
         private VolumeChunk chunk;
-        [SerializeField] private bool rotate;
+        [FormerlySerializedAs("rotate")] [SerializeField] private bool update;
         [SerializeField] private Vector2 position;
         [SerializeField] private float rotation = 4.6f;
         [SerializeField] private float scale = 1.0f;
 
         private int size = 16;
         private Rect area = new Rect(0.0f, 0.0f, 4.0f, 4.0f);
-        private SdfEvaluator evaluator;
+        private SdfObject obj;
         
         private void Awake()
         {
             /* Generate a volume filled with the SDF of a circle */
             chunk = new VolumeChunk(new Vector2Int(size, size), area);
-            evaluator = new RectEvaluator(new Vector2(3f, 1.5f)); 
-            var trans = new TransformEvaluator(position, rotation, scale);
-            evaluator.EvaluateAgainst(chunk, trans);
+            obj = new SdfObject(new RectEvaluator(new Vector2(2.0f, 1.0f)));
         }
 
         private void Update()
         {
-            if (rotate)
+            if (update)
             {
                 // rotation += 15 * Time.deltaTime;
                 chunk = new VolumeChunk(new Vector2Int(size, size), area);
-                var trans = new TransformEvaluator(position, rotation, scale);
-                evaluator.EvaluateAgainst(chunk, trans);
+                obj.Position = position;
+                obj.Rotation = rotation;
+                obj.Scale = scale;
+                chunk.Update(obj);
+                // evaluator.EvaluateAgainst(chunk, trans);
             }
         }
 

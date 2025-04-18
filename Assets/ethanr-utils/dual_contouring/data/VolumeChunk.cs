@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using ethanr_utils.dual_contouring.csg_ops;
 using UnityEngine;
 
 namespace ethanr_utils.dual_contouring.data
@@ -97,6 +98,19 @@ namespace ethanr_utils.dual_contouring.data
             }
             
             return voxels;
+        }
+
+        public void Update(SdfOperator sdf)
+        {
+            for (int x = 0; x < Points.GetLength(0); x++)
+            {
+                for (int y = 0; y < Points.GetLength(1); y++)
+                {
+                    var pos = VoxelToWorld(new Vector2Int(x, y));
+                    var sample = sdf.SampleValue(pos);
+                    Points[x, y] = new Voxel(0, sample);
+                }
+            }
         }
     }   
 }
