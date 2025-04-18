@@ -23,9 +23,6 @@ namespace ethanr_utils.dual_contouring.computation
         {
             /* SYNC POINT: Sampling data provided */
             /* GOAL: Compute all intersections and normals */
-
-            SurfacePoint.CURRENT_ID = 1;
-            
             /* Start with right and up from source */
             for (int x = 0; x < chunk.Points.GetLength(0) - 1; x++)
             {
@@ -162,7 +159,7 @@ namespace ethanr_utils.dual_contouring.computation
                             var edgePoint = new SurfacePoint()
                             {
                                 Position = isct,
-                                SurfaceID = SurfacePoint.CURRENT_ID++,
+                                SurfaceID = 0,
                                 Adjacent = new List<SurfacePoint>()
                             };
 
@@ -183,7 +180,7 @@ namespace ethanr_utils.dual_contouring.computation
                             var edgePoint = new SurfacePoint()
                             {
                                 Position = isct,
-                                SurfaceID = SurfacePoint.CURRENT_ID++,
+                                SurfaceID = 0,
                                 Adjacent = new List<SurfacePoint>()
                             };
 
@@ -207,7 +204,7 @@ namespace ethanr_utils.dual_contouring.computation
                             var edgePoint = new SurfacePoint()
                             {
                                 Position = isct,
-                                SurfaceID = SurfacePoint.CURRENT_ID++,
+                                SurfaceID = 0,
                                 Adjacent = new List<SurfacePoint>()
                             };
 
@@ -228,7 +225,7 @@ namespace ethanr_utils.dual_contouring.computation
                             var edgePoint = new SurfacePoint()
                             {
                                 Position = isct,
-                                SurfaceID = SurfacePoint.CURRENT_ID++,
+                                SurfaceID = 0,
                                 Adjacent = new List<SurfacePoint>()
                             };
 
@@ -328,28 +325,7 @@ namespace ethanr_utils.dual_contouring.computation
             while (open.Count > 0)
             {
                 /* Find this meshes starting point */
-                SurfacePoint start = null;
-                foreach (var point in open)
-                {
-                    if (point.SurfaceID == currID)
-                    {
-                        /* Found our starting point */
-                        start = point;
-                        break;
-                    }
-                }
-                
-                /* If we didn't find a starting point, there is only one submesh remaining! */
-                if (start == null)
-                {
-                    foreach (var point in open)
-                    {
-                        point.SurfaceID = currID;
-                    }
-
-                    Debug.Log($"FloodFill exiting early with {currID} surfaces.");
-                    return;
-                }
+                SurfacePoint start = open.First();
                 
                 /* Flood fill the current mesh */
                 Queue<SurfacePoint> queue = new Queue<SurfacePoint>();

@@ -27,21 +27,26 @@ namespace ethanr_utils.dual_contouring
         private void Awake()
         {
             /* Generate a volume filled with the SDF of a circle */
-            chunk = new VolumeChunk(new Vector2Int(size, size), area);
-            var largerCircle = new CircleSdf(1.5f);
-            var smallerCircle = new CircleSdf(.75f);
-            var torus = new DifferenceSdf(largerCircle, smallerCircle);
-            obj = new SdfObject(torus);
+            // chunk = new VolumeChunk(new Vector2Int(size, size), area);
+            // var largerCircle = new CircleSdf(1.5f);
+            // var smallerCircle = new CircleSdf(.75f);
+            // var torus = new DifferenceSdf(largerCircle, smallerCircle);
+            // obj = new SdfObject(torus);
             
-            // var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
-            // var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
-            // var union = new UnionSdf(r1, r2);
-            // obj = new SdfObject(union);
+            var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
+            var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
+            var union = new UnionSdf(r1, r2);
+            obj = new SdfObject(union);
             
             // var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
             // var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
             // var diff = new DifferenceSdf(r1, r2);
             // obj = new SdfObject(diff);
+            
+            // var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
+            // var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
+            // var isct = new IntersectionSdf(r1, r2);
+            // obj = new SdfObject(isct);
             
             // obj = new SdfObject(new RectSdf(new Vector2(2.0f, 1.0f)));
         }

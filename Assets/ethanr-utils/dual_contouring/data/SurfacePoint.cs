@@ -8,8 +8,6 @@ namespace ethanr_utils.dual_contouring.data
     /// </summary>
     public class SurfacePoint
     {
-        public static uint CURRENT_ID = 1;
-        
         /// <summary>
         /// The world-space position of this point.
         /// </summary>
