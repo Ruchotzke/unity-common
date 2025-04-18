@@ -148,9 +148,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d4056c3032534d8a8ac5f3cf14104045, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  rotate: 1
+  update: 1
   position: {x: 1.5, y: 2}
-  rotation: 5.6
+  rotation: 0
   scale: 1
 --- !u!4 &43067942
 Transform:

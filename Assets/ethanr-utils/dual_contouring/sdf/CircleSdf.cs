@@ -7,7 +7,7 @@ namespace ethanr_utils.dual_contouring.sdf
     /// <summary>
     /// The SDF evaluator for a circle.
     /// </summary>
-    public class CircleEvaluator : SdfOperator
+    public class CircleSdf : SdfOperator
     {
         
         /// <summary>
@@ -19,7 +19,7 @@ namespace ethanr_utils.dual_contouring.sdf
         /// Construct a new circle evaluator.
         /// </summary>
         /// <param name="radius"></param>
-        public CircleEvaluator(float radius)
+        public CircleSdf(float radius)
         {
             Radius = radius;
         }

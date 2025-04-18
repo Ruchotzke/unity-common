@@ -28,7 +28,22 @@ namespace ethanr_utils.dual_contouring
         {
             /* Generate a volume filled with the SDF of a circle */
             chunk = new VolumeChunk(new Vector2Int(size, size), area);
-            obj = new SdfObject(new RectEvaluator(new Vector2(2.0f, 1.0f)));
+            var largerCircle = new CircleSdf(1.5f);
+            var smallerCircle = new CircleSdf(.75f);
+            var torus = new DifferenceSdf(largerCircle, smallerCircle);
+            obj = new SdfObject(torus);
+            
+            // var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
+            // var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
+            // var union = new UnionSdf(r1, r2);
+            // obj = new SdfObject(union);
+            
+            // var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
+            // var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
+            // var diff = new DifferenceSdf(r1, r2);
+            // obj = new SdfObject(diff);
+            
+            // obj = new SdfObject(new RectSdf(new Vector2(2.0f, 1.0f)));
         }
 
         private void Update()

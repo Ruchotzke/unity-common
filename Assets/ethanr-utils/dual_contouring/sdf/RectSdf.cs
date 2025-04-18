@@ -8,7 +8,7 @@ namespace ethanr_utils.dual_contouring.sdf
     /// <summary>
     /// The SDF evaluator for a circle.
     /// </summary>
-    public class RectEvaluator : SdfOperator
+    public class RectSdf : SdfOperator
     {
         
         /// <summary>
@@ -20,7 +20,7 @@ namespace ethanr_utils.dual_contouring.sdf
         /// Construct a new circle evaluator.
         /// </summary>
         /// <param name="extents"></param>
-        public RectEvaluator(Vector2 extents)
+        public RectSdf(Vector2 extents)
         {
             Extents = extents;
         }
