@@ -22,7 +22,7 @@ namespace ethanr_utils.dual_contouring.data
         /// <summary>
         /// Neighboring vertices for this point
         /// </summary>
-        public List<SurfacePoint> Adjacent;
+        public List<SurfacePoint> Adjacent = new List<SurfacePoint>();
 
         public override string ToString()
         {

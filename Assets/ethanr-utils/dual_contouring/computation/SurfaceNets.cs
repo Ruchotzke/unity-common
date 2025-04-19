@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using ethanr_utils.dual_contouring.csg_ops;
 using ethanr_utils.dual_contouring.data;
 using Unity.VisualScripting;
 using UnityEngine;
@@ -19,7 +20,7 @@ namespace ethanr_utils.dual_contouring.computation
         /// </summary>
         /// <param name="chunk"></param>
         /// <returns></returns>
-        public static List<List<SurfacePoint>> Generate(VolumeChunk chunk)
+        public static List<List<SurfacePoint>> Generate(VolumeChunk chunk, SdfOperator sdf)
         {
             /* SYNC POINT: Sampling data provided */
             /* GOAL: Compute all intersections and normals */
@@ -135,7 +136,7 @@ namespace ethanr_utils.dual_contouring.computation
 
             /* SYNC POINT - All relevant voxels have a point */
             /* GOAL: Connect voxel points together into isosurface */
-            var mapBoundaryPoints = new List<SurfacePoint>(); //also save these to finish loops later
+            var mapBoundaryPoints = new BorderContainer(); //also save these to finish loops later
             
             /* Traverse all surface voxel edges (identified earlier) to find neighboring points */
             foreach (var voxelEdge in surfaceEdges)
@@ -163,7 +164,7 @@ namespace ethanr_utils.dual_contouring.computation
                                 Adjacent = new List<SurfacePoint>()
                             };
 
-                            mapBoundaryPoints.Add(edgePoint);
+                            mapBoundaryPoints.AddLeftBorder(edgePoint, sdf.SampleNormal(edgePoint.Position));
                             edgePoint.Adjacent.Add(innerPoint);
                             innerPoint.Adjacent.Add(edgePoint);
                         }
@@ -184,7 +185,7 @@ namespace ethanr_utils.dual_contouring.computation
                                 Adjacent = new List<SurfacePoint>()
                             };
 
-                            mapBoundaryPoints.Add(edgePoint);
+                            mapBoundaryPoints.AddRightBorder(edgePoint, sdf.SampleNormal(edgePoint.Position));
                             edgePoint.Adjacent.Add(innerPoint);
                             innerPoint.Adjacent.Add(edgePoint);
                         }
@@ -208,7 +209,7 @@ namespace ethanr_utils.dual_contouring.computation
                                 Adjacent = new List<SurfacePoint>()
                             };
 
-                            mapBoundaryPoints.Add(edgePoint);
+                            mapBoundaryPoints.AddBottomBorder(edgePoint, sdf.SampleNormal(edgePoint.Position));
                             edgePoint.Adjacent.Add(innerPoint);
                             innerPoint.Adjacent.Add(edgePoint);
                         }
@@ -229,7 +230,7 @@ namespace ethanr_utils.dual_contouring.computation
                                 Adjacent = new List<SurfacePoint>()
                             };
 
-                            mapBoundaryPoints.Add(edgePoint);
+                            mapBoundaryPoints.AddTopBorder(edgePoint, sdf.SampleNormal(edgePoint.Position));
                             edgePoint.Adjacent.Add(innerPoint);
                             innerPoint.Adjacent.Add(edgePoint);
                         }
@@ -265,10 +266,19 @@ namespace ethanr_utils.dual_contouring.computation
                 }
             }
             
+            /* Don't forget the potential corner/edge loops too */
+            var corners = mapBoundaryPoints.GetCorners(chunk.Area);
+            var cornerList = new List<SurfacePoint>();
+            if (corners.bl != null) cornerList.Add(corners.bl);
+            if (corners.br != null) cornerList.Add(corners.br);
+            if (corners.tr != null) cornerList.Add(corners.tr);
+            if (corners.tl != null) cornerList.Add(corners.tl);
+            
             /* Tag/fill in surface IDs of all points */
             List<SurfacePoint> allSurfacePoints = new List<SurfacePoint>();
             allSurfacePoints.AddRange(surfacePoints.Values);
-            allSurfacePoints.AddRange(mapBoundaryPoints);
+            allSurfacePoints.AddRange(mapBoundaryPoints.GetAll());
+            allSurfacePoints.AddRange(cornerList);
             FloodFillSurfaces(allSurfacePoints);
             
             /* SYNC POINT - All edges have been enumerated and points tagged */
@@ -351,7 +361,7 @@ namespace ethanr_utils.dual_contouring.computation
                 currID++;
             }
             
-            Debug.Log($"Finished flood filling mesh with {currID} surfaces.");
+            // Debug.Log($"Finished flood filling mesh with {currID} surfaces.");
         }
 
         /// <summary>

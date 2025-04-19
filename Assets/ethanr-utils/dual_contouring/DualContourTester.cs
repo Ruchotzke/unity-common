@@ -85,7 +85,7 @@ namespace ethanr_utils.dual_contouring
                 }
                 
                 /* Voxel */
-                edges = SurfaceNets.Generate(chunk);
+                edges = SurfaceNets.Generate(chunk, obj);
                 
                 if (edges != null)
                 {
