@@ -267,12 +267,15 @@ namespace ethanr_utils.dual_contouring.computation
             }
             
             /* Don't forget the potential corner/edge loops too */
-            var corners = mapBoundaryPoints.GetCorners(chunk.Area);
+            var corners = mapBoundaryPoints.GetCorners(chunk.Area, sdf);
             var cornerList = new List<SurfacePoint>();
             if (corners.bl != null) cornerList.Add(corners.bl);
             if (corners.br != null) cornerList.Add(corners.br);
             if (corners.tr != null) cornerList.Add(corners.tr);
             if (corners.tl != null) cornerList.Add(corners.tl);
+            
+            /* Also connect up adjacent edges on the borders */
+            mapBoundaryPoints.ConnectEdges();
             
             /* Tag/fill in surface IDs of all points */
             List<SurfacePoint> allSurfacePoints = new List<SurfacePoint>();

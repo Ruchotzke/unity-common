@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
+using ethanr_utils.dual_contouring.csg_ops;
 using UnityEngine;
 
 namespace ethanr_utils.dual_contouring.data
@@ -58,10 +59,12 @@ namespace ethanr_utils.dual_contouring.data
         }
 
         /// <summary>
-        /// Attempt to figure out the corner statuses of this border container
+        /// Compute and generate the four courners of this border container.
         /// </summary>
+        /// <param name="region"></param>
+        /// <param name="sdf"></param>
         /// <returns></returns>
-        public (SurfacePoint? br, SurfacePoint? bl, SurfacePoint? tr, SurfacePoint? tl) GetCorners(Rect region)
+        public (SurfacePoint? bl, SurfacePoint? br, SurfacePoint? tr, SurfacePoint? tl) GetCorners(Rect region, SdfOperator sdf)
         {
             /* We need the min/max of each border */
             (SurfacePoint point, Vector2 norm)? leftMin = null;
@@ -95,272 +98,134 @@ namespace ethanr_utils.dual_contouring.data
                 if(topMax == null || topMax.Value.point.Position.y < top.point.Position.y) topMax = top;
             }
             
-            /* Use normals to determine if corners are filled or not */
+            /* Using sampling we can compute whether the corners are contained or not */
+            var blIn = sdf.SampleValue(region.min) <= 0.0f;
+            var brIn = sdf.SampleValue(new Vector2(region.max.x, region.min.y)) <= 0.0f;
+            var trIn = sdf.SampleValue(region.max) <= 0.0f;
+            var tlIn = sdf.SampleValue(new Vector2(region.min.x, region.max.y)) <= 0.0f;
             
-            /* Bottom left corner */
-            SurfacePoint? bl = null;
-            bool blTrulyNull = false;
-            if (leftMin != null && botMin != null)
+            /* Generate the vertices */
+            var bl = blIn ? new SurfacePoint()
             {
-                bool vertFilled = leftMin.Value.norm.y > 0;
-                bool horizFilled = botMin.Value.norm.x > 0;
-
-                if (vertFilled != horizFilled)
+                Position = region.min,
+            } : null;
+            var br = brIn ? new SurfacePoint()
+            {
+                Position = new Vector2(region.max.x, region.min.y),
+            } : null;
+            var tr = trIn ? new SurfacePoint()
+            {
+                Position = region.max,
+            } : null;
+            var tl = tlIn ? new SurfacePoint()
+            {
+                Position = new Vector2(region.min.x, region.max.y),
+            } : null;
+            
+            /* Connect up the vertices to their neighbors */
+            if (bl != null)
+            {
+                /* Right side */
+                if (botMin != null)
                 {
-                    Debug.LogError($"BL not consistent: left{vertFilled}, bot{horizFilled}");
-                }
-                else if (horizFilled)
-                {
-                    /* Generate a new corner vertex */
-                    bl = new SurfacePoint()
-                    {
-                        Position = new Vector2(leftMin.Value.point.Position.x, botMin.Value.point.Position.y),
-                    };
-                    bl.Adjacent.Add(leftMin.Value.point);
-                    leftMin.Value.point.Adjacent.Add(bl);
                     bl.Adjacent.Add(botMin.Value.point);
                     botMin.Value.point.Adjacent.Add(bl);
                 }
-            }
-            else if (leftMin != null)
-            {
-                if (leftMin.Value.norm.y > 0)
+                else if (br != null)
                 {
-                    bl = new SurfacePoint()
-                    {
-                        Position = region.min,
-                    };
+                    br.Adjacent.Add(bl);
+                    bl.Adjacent.Add(br);
+                }
+                
+                /* Up side */
+                if (leftMin != null)
+                {
                     bl.Adjacent.Add(leftMin.Value.point);
                     leftMin.Value.point.Adjacent.Add(bl);
                 }
-            }
-            else if (botMin != null)
-            {
-                if (botMin.Value.norm.x > 0)
+                else if (tl != null)
                 {
-                    bl = new SurfacePoint()
-                    {
-                        Position = region.min,
-                    };
-                    bl.Adjacent.Add(botMin.Value.point);
-                    botMin.Value.point.Adjacent.Add(bl);
+                    tl.Adjacent.Add(bl);
+                    bl.Adjacent.Add(tl);
                 }
             }
-            else
+            if (br != null)
             {
-                blTrulyNull = true;
-            }
-            
-            /* Bottom right corner */
-            SurfacePoint? br = null;
-            bool brTrulyNull = false;
-            if (botMax != null && rightMin != null)
-            {
-                bool vertFilled = rightMin.Value.norm.y > 0;
-                bool horizFilled = botMax.Value.norm.x < 0;
-
-                if (vertFilled != horizFilled)
+                /* Left side */
+                if (botMax != null)
                 {
-                    Debug.LogError($"BR not consistent: bot{horizFilled}, right{vertFilled}");
-                }
-                else if (horizFilled)
-                {
-                    /* Generate a new corner vertex */
-                    br = new SurfacePoint()
-                    {
-                        Position = new Vector2(rightMin.Value.point.Position.x, botMax.Value.point.Position.y),
-                    };
                     br.Adjacent.Add(botMax.Value.point);
                     botMax.Value.point.Adjacent.Add(br);
+                }
+                else if (bl != null)
+                {
+                    /* Do nothing, we would have already added them as a neighbor */
+                }
+                
+                /* Up side */
+                if (rightMin != null)
+                {
                     br.Adjacent.Add(rightMin.Value.point);
                     rightMin.Value.point.Adjacent.Add(br);
                 }
-            }
-            else if (botMax != null)
-            {
-                if (botMax.Value.norm.x < 0)
+                else if (tr != null)
                 {
-                    br = new SurfacePoint()
-                    {
-                        Position = new Vector2(region.max.x, region.min.y),
-                    };
-                    br.Adjacent.Add(botMax.Value.point);
-                    botMax.Value.point.Adjacent.Add(br);
-                }   
-            }
-            else if (rightMin != null)
-            {
-                if (rightMin.Value.norm.y > 0)
-                {
-                    br = new SurfacePoint()
-                    {
-                        Position = new Vector2(region.max.x, region.min.y),
-                    };
-                    br.Adjacent.Add(rightMin.Value.point);
-                    rightMin.Value.point.Adjacent.Add(br);
+                    tr.Adjacent.Add(br);
+                    br.Adjacent.Add(tr);
                 }
             }
-            else
+            if (tr != null)
             {
-                brTrulyNull = true;
-            }
-            
-            /* Top right corner */
-            SurfacePoint? tr = null;
-            bool trTrulyNull = false;
-            if (topMax != null && rightMax != null)
-            {
-                bool vertFilled = rightMax.Value.norm.y < 0;
-                bool horizFilled = topMax.Value.norm.x < 0;
-
-                if (vertFilled != horizFilled)
+                /* Left side */
+                if (topMax != null)
                 {
-                    Debug.LogError($"TR not consistent: top{horizFilled}, right{vertFilled}");
-                }
-                else if (horizFilled)
-                {
-                    /* Generate a new corner vertex */
-                    tr = new SurfacePoint()
-                    {
-                        Position = new Vector2(rightMax.Value.point.Position.x, topMax.Value.point.Position.y),
-                    };
-                    tr.Adjacent.Add(topMax.Value.point);
-                    topMax.Value.point.Adjacent.Add(tr);
-                    tr.Adjacent.Add(rightMax.Value.point);
-                    rightMax.Value.point.Adjacent.Add(tr);
-                }
-            }
-            else if (topMax != null)
-            {
-                if (topMax.Value.norm.x < 0)
-                {
-                    tr = new SurfacePoint()
-                    {
-                        Position = region.max,
-                    };
                     tr.Adjacent.Add(topMax.Value.point);
                     topMax.Value.point.Adjacent.Add(tr);
                 }
-            }
-            else if (rightMax != null)
-            {
-                if (rightMax.Value.norm.y < 0)
+                else if (tl != null)
                 {
-                    tr = new SurfacePoint()
-                    {
-                        Position = region.max,
-                    };
+                    tl.Adjacent.Add(tr);
+                    tr.Adjacent.Add(tl);
+                }
+                
+                /* Lower side */
+                if (rightMax != null)
+                {
                     tr.Adjacent.Add(rightMax.Value.point);
                     rightMax.Value.point.Adjacent.Add(tr);
                 }
-            }
-            else
-            {
-                trTrulyNull = true;
-            }
-            
-            /* Top left corner */
-            SurfacePoint? tl = null;
-            bool tlTrulyNull = false;
-            if (topMin != null && leftMax != null)
-            {
-                bool vertFilled = leftMax.Value.norm.y < 0;
-                bool horizFilled = topMin.Value.norm.x > 0;
-
-                if (vertFilled != horizFilled)
+                else if (br != null)
                 {
-                    Debug.LogError($"TL not consistent: top{horizFilled}, left{vertFilled}");
+                    /* Do nothing, we would have already added this case */
                 }
-                else if (horizFilled)
+            }
+            if (tl != null)
+            {
+                /* Right side */
+                if (topMin != null)
                 {
-                    /* Generate a new corner vertex */
-                    tl = new SurfacePoint()
-                    {
-                        Position = new Vector2(leftMax.Value.point.Position.x, topMin.Value.point.Position.y),
-                    };
-                    tl.Adjacent.Add(leftMax.Value.point);
-                    leftMax.Value.point.Adjacent.Add(tl);
                     tl.Adjacent.Add(topMin.Value.point);
                     topMin.Value.point.Adjacent.Add(tl);
                 }
-            }
-            else if (topMin != null)
-            {
-                if (topMin.Value.norm.x > 0)
+                else if (tr != null)
                 {
-                    tl = new SurfacePoint()
-                    {
-                        Position = new Vector2(region.min.x, region.max.y),
-                    };
-                    tl.Adjacent.Add(topMin.Value.point);
-                    topMin.Value.point.Adjacent.Add(tl);
+                    /* Do nothing, we would have already added this case */
                 }
-            }
-            else if (leftMax != null)
-            {
-                if (leftMax.Value.norm.y < 0)
+                
+                /* Lower side */
+                if (leftMax != null)
                 {
-                    tl = new SurfacePoint()
-                    {
-                        Position = new Vector2(region.min.x, region.max.y),
-                    };
                     tl.Adjacent.Add(leftMax.Value.point);
                     leftMax.Value.point.Adjacent.Add(tl);
                 }
-            }
-            else
-            {
-                tlTrulyNull = true;
+                else if (bl != null)
+                {
+                    /* Do nothing, we would have already added this case */
+                }
             }
             
-            /* SYNC POINT: We have computed each individually. We should now check if any of the corners themselves are null and shouldn't be */
-            if (bl == null && blTrulyNull && br != null && tl != null)
-            {
-                bl = new SurfacePoint()
-                {
-                    Position = region.min,
-                };
-                bl.Adjacent.Add(br);
-                bl.Adjacent.Add(tl);
-                tl.Adjacent.Add(bl);
-                br.Adjacent.Add(bl);
-            }
-            if (br == null && brTrulyNull && bl != null && tr != null)
-            {
-                br = new SurfacePoint()
-                {
-                    Position = new Vector2(region.max.x, region.min.y)
-                };
-                br.Adjacent.Add(bl);
-                br.Adjacent.Add(tr);
-                bl.Adjacent.Add(br);
-                tr.Adjacent.Add(br);
-            }
-            if (tr == null && trTrulyNull && br != null && tl != null)
-            {
-                tr = new SurfacePoint()
-                {
-                    Position = region.max,
-                };
-                tr.Adjacent.Add(br);
-                tr.Adjacent.Add(tl);
-                br.Adjacent.Add(tr);
-                tl.Adjacent.Add(tr);
-            }
-            if (tl == null && tlTrulyNull && tr != null && bl != null)
-            {
-                tl = new SurfacePoint()
-                {
-                    Position = new Vector2(region.min.x, region.max.y),
-                };
-                tl.Adjacent.Add(tr);
-                tl.Adjacent.Add(bl);
-                tr.Adjacent.Add(tl);
-                bl.Adjacent.Add(tl);
-            }
-            
-            /* THAT SHOULD BE EVERYTHING I HOPE */
-            return (br, bl, tr, tl);
+            /* Hopefully successful returned result */
+            return (bl, br, tr, tl);
         }
 
         /// <summary>
@@ -368,7 +233,67 @@ namespace ethanr_utils.dual_contouring.data
         /// </summary>
         public void ConnectEdges()
         {
-            //Todo!
+            /* Sort the lists from min/max */
+            leftBorders.Sort((a, b) => a.point.Position.y.CompareTo(b.point.Position.y));
+            rightBorders.Sort((a, b) => a.point.Position.y.CompareTo(b.point.Position.y));
+            topBorders.Sort((a, b) => a.point.Position.x.CompareTo(b.point.Position.x));
+            bottomBorders.Sort((a, b) => a.point.Position.x.CompareTo(b.point.Position.x));
+            
+            /* Left */
+            if (leftBorders.Count > 1)
+            {
+                var curr = leftBorders[0].normal.y > 0 ? 1 : 0;
+                for (; curr < leftBorders.Count - 1; curr += 2)
+                {
+                    if (curr + 1 >= leftBorders.Count) break;
+                    var a = leftBorders[curr].point;
+                    var b = leftBorders[curr + 1].point;
+                    a.Adjacent.Add(b);
+                    b.Adjacent.Add(a);
+                }
+            }
+            
+            /* Right */
+            if (rightBorders.Count > 1)
+            {
+                var curr = rightBorders[0].normal.y > 0 ? 1 : 0;
+                for (; curr < rightBorders.Count - 1; curr += 2)
+                {
+                    if (curr + 1 >= rightBorders.Count) break;
+                    var a = rightBorders[curr].point;
+                    var b = rightBorders[curr + 1].point;
+                    a.Adjacent.Add(b);
+                    b.Adjacent.Add(a);
+                }
+            }
+            
+            /* Bottom */
+            if (bottomBorders.Count > 1)
+            {
+                var curr = bottomBorders[0].normal.x > 0 ? 1 : 0;
+                for (; curr < bottomBorders.Count - 1; curr += 2)
+                {
+                    if (curr + 1 >= bottomBorders.Count) break;
+                    var a = bottomBorders[curr].point;
+                    var b = bottomBorders[curr + 1].point;
+                    a.Adjacent.Add(b);
+                    b.Adjacent.Add(a);
+                }
+            }
+            
+            /* Top */
+            if (topBorders.Count > 1)
+            {
+                var curr = topBorders[0].normal.x > 0 ? 1 : 0;
+                for (; curr < topBorders.Count - 1; curr += 2)
+                {
+                    if (curr + 1 >= topBorders.Count) break;
+                    var a = topBorders[curr].point;
+                    var b = topBorders[curr + 1].point;
+                    a.Adjacent.Add(b);
+                    b.Adjacent.Add(a);
+                }
+            }
         }
     }
 }
