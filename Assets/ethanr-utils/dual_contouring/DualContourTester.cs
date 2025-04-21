@@ -98,18 +98,27 @@ namespace ethanr_utils.dual_contouring
                 
                 if (edges != null)
                 {
-                    string surfaceIDs = "";
-                    foreach (var surface in edges)
-                    { 
-                        surfaceIDs += surface[0].SurfaceID + ", ";
-                        var surfaceColor = Color.HSVToRGB(Random.Range(0.0f, 1.0f), 1.0f, 1.0f);
-                        foreach (var point in surface)
+                    Gizmos.color = Color.green;
+                    foreach (var polygon in edges)
+                    {
+                        for (int i = 0; i < polygon.Count-1; i++)
                         {
-                            Gizmos.color = surfaceColor;
-                            Gizmos.DrawSphere(point.Position.ToVector3WithZ(-0.05f), 0.05f);
+                            Gizmos.DrawLine(polygon[i].Position, polygon[i + 1].Position);
                         }
+                        Gizmos.DrawLine(polygon[0].Position, polygon[^1].Position);
                     }
-                    Debug.Log(surfaceIDs);
+                    // string surfaceIDs = "";
+                    // foreach (var surface in edges)
+                    // { 
+                    //     surfaceIDs += surface[0].SurfaceID + ", ";
+                    //     var surfaceColor = Color.HSVToRGB(Random.Range(0.0f, 1.0f), 1.0f, 1.0f);
+                    //     foreach (var point in surface)
+                    //     {
+                    //         Gizmos.color = surfaceColor;
+                    //         Gizmos.DrawSphere(point.Position.ToVector3WithZ(-0.05f), 0.05f);
+                    //     }
+                    // }
+                    // Debug.Log(surfaceIDs);
                 }
                 
             }

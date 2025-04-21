@@ -287,11 +287,79 @@ namespace ethanr_utils.dual_contouring.computation
             /* SYNC POINT - All edges have been enumerated and points tagged */
             /* GOAL: Put connected isosurfaces into their own polygons */
             var surfaces = GenerateSurfaces(allSurfacePoints);
+            var polygons = GeneratePolygons(surfaces);
             
             /* SYNC POINT - All voxel data has been encoded into polygons */
             /* GOAL: Generate a mesh */
 
-            return surfaces;
+            return polygons;
+        }
+
+        /// <summary>
+        /// Generated ordered polygons from the provided sets of surface point.
+        /// </summary>
+        /// <param name="surfaces"></param>
+        /// <returns></returns>
+        private static List<List<SurfacePoint>> GeneratePolygons(List<List<SurfacePoint>> surfaces)
+        {
+            List<List<SurfacePoint>> polygons = new List<List<SurfacePoint>>();
+
+            foreach (var surface in surfaces)
+            {
+                List<SurfacePoint> polygon = new List<SurfacePoint>();
+
+                /* Use BFS to build an ordered loop */
+                Queue<SurfacePoint> queue = new Queue<SurfacePoint>();
+                queue.Enqueue(surface[0]);
+                surface.RemoveAt(0);
+
+                /* BFS */
+                while (queue.Count > 0)
+                {
+                    /* Grab the next entry */
+                    var curr = queue.Dequeue();
+                    
+                    /* Add neighbors if they haven't been added yet */
+                    foreach (var neighbor in curr.Adjacent)
+                    {
+                        if (!surface.Contains(neighbor)) continue;
+                        queue.Enqueue(neighbor);
+                        surface.Remove(neighbor);
+                    }
+                    
+                    /* Place this vertex into the loop appropriately. */
+                    if (polygon.Count == 0)
+                    {
+                        polygon.Add(curr);
+                    }
+                    else
+                    {
+                        if (polygon[0].Adjacent.Contains(curr)) // first entry
+                        {
+                            polygon.Insert(0, curr);
+                        }
+                        else if (polygon[^1].Adjacent.Contains(curr)) // insertion entry
+                        {
+                            polygon.Add(curr);
+                        }
+                        else // uh oh
+                        {
+                            /* Whoa! This isn't connected... */
+                            Debug.LogError($"Missing connected vertex for {curr}");
+                        }
+                    }
+                }
+                
+                /* If this surface still has points, something went wrong */
+                if (surface.Count > 0)
+                {
+                    Debug.LogError("Unable to assemble polygon from surface.");
+                }
+                
+                polygons.Add(polygon);
+            }
+
+            return polygons;
         }
 
         private static List<List<SurfacePoint>> GenerateSurfaces(List<SurfacePoint> surfacePoints)
