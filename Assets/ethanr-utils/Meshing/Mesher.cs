@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using UnityUtilities.General;
 
 namespace UnityUtilities.Meshing
 {
@@ -92,6 +93,19 @@ namespace UnityUtilities.Meshing
             mesh.RecalculateNormals();
 
             return mesh;
+        }
+
+        /// <summary>
+        /// Add a trriangleNET triangle to this mesh
+        /// </summary>
+        /// <param name="triangle"></param>
+        public void AddTriangle(TriangleNet.Topology.Triangle triangle)
+        {
+            Vector3 a = triangle.vertices[0].ToVector2();
+            Vector3 b = triangle.vertices[1].ToVector2();
+            Vector3 c = triangle.vertices[2].ToVector2();
+            
+            AddTriangle(a, c, b);
         }
 
         /// <summary>

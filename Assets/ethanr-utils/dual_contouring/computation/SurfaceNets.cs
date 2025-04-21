@@ -2,8 +2,10 @@ using System.Collections.Generic;
 using System.Linq;
 using ethanr_utils.dual_contouring.csg_ops;
 using ethanr_utils.dual_contouring.data;
+using TriangleNet.Geometry;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityUtilities.Meshing;
 
 namespace ethanr_utils.dual_contouring.computation
 {
@@ -20,7 +22,7 @@ namespace ethanr_utils.dual_contouring.computation
         /// </summary>
         /// <param name="chunk"></param>
         /// <returns></returns>
-        public static List<List<SurfacePoint>> Generate(VolumeChunk chunk, SdfOperator sdf)
+        public static List<Mesh> Generate(VolumeChunk chunk, SdfOperator sdf)
         {
             /* SYNC POINT: Sampling data provided */
             /* GOAL: Compute all intersections and normals */
@@ -292,7 +294,54 @@ namespace ethanr_utils.dual_contouring.computation
             /* SYNC POINT - All voxel data has been encoded into polygons */
             /* GOAL: Generate a mesh */
 
-            return polygons;
+            return GenerateMeshes(polygons);
+        }
+
+        /// <summary>
+        /// Triangulate all of the provided meshes from their polygons.
+        /// </summary>
+        /// <param name="polygons"></param>
+        /// <returns></returns>
+        private static List<Mesh> GenerateMeshes(List<List<SurfacePoint>> polygons)
+        {
+            List<Mesh> meshes = new List<Mesh>();
+            
+            foreach (var polygon in polygons)
+            {
+                /* Generate the triangulation */
+                var tripoly = new Polygon();
+                var vertices = GenerateVertices(polygon);
+                tripoly.Add(new Contour(vertices));
+                var triangulation = tripoly.Triangulate();
+                
+                /* Generate and save the mesh */
+                Mesher mesher = new Mesher(false);
+                foreach (var tri in triangulation.Triangles)
+                {
+                    mesher.AddTriangle(tri);
+                }
+                
+                meshes.Add(mesher.GenerateMesh());
+            }
+
+            return meshes;
+        }
+
+        /// <summary>
+        /// Helper to convert our points into vertices for trianglenet
+        /// </summary>
+        /// <param name="contour"></param>
+        /// <returns></returns>
+        private static List<Vertex> GenerateVertices(List<SurfacePoint> contour)
+        {
+            List<Vertex> vertices = new List<Vertex>();
+
+            foreach (var contourPoint in contour)
+            {
+                vertices.Add(new Vertex(contourPoint.Position.x, contourPoint.Position.y));
+            }
+            
+            return vertices;
         }
 
         /// <summary>

@@ -24,28 +24,29 @@ namespace ethanr_utils.dual_contouring
         private Rect area = new Rect(0.0f, 0.0f, 4.0f, 4.0f);
         private SdfObject obj;
         
+        private List<MeshFilter> currFilters = new List<MeshFilter>();
+        
         private void Awake()
         {
-            /* Generate a volume filled with the SDF of a circle */
             // chunk = new VolumeChunk(new Vector2Int(size, size), area);
             // var largerCircle = new CircleSdf(1.5f);
             // var smallerCircle = new CircleSdf(.75f);
             // var torus = new DifferenceSdf(largerCircle, smallerCircle);
             // obj = new SdfObject(torus);
             
-            // var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
-            // var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
-            // var union = new UnionSdf(r1, r2);
-            // obj = new SdfObject(union);
+            var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
+            var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
+            var union = new UnionSdf(r1, r2);
+            obj = new SdfObject(union);
 
-            var rect = new RectSdf(new Vector2(3.0f, 2.0f));
-            var rectObj = new SdfObject(rect);
-            var circ = new CircleSdf(1.0f);
-            var circObj = new SdfObject(circ);
-            rectObj.Position += new Vector2(1.0f, -1.0f);
-            circObj.Position += new Vector2(-1.0f, 3.0f);
-            var finalUnion = new UnionSdf(rectObj, circObj);
-            obj = new SdfObject(finalUnion);
+            // var rect = new RectSdf(new Vector2(3.0f, 2.0f));
+            // var rectObj = new SdfObject(rect);
+            // var circ = new CircleSdf(1.0f);
+            // var circObj = new SdfObject(circ);
+            // rectObj.Position += new Vector2(1.0f, -1.0f);
+            // circObj.Position += new Vector2(-1.0f, 3.0f);
+            // var finalUnion = new UnionSdf(rectObj, circObj);
+            // obj = new SdfObject(finalUnion);
 
             // var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
             // var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
@@ -72,6 +73,24 @@ namespace ethanr_utils.dual_contouring
                 chunk.Update(obj);
                 // evaluator.EvaluateAgainst(chunk, trans);
             }
+            
+            /* Remove the old meshes */
+            while (currFilters.Count > 0)
+            {
+                MeshPool.Instance.MeshFilterPool.Release(currFilters[0]);
+                currFilters.RemoveAt(0);
+            }
+            
+            /* Render the meshes */
+            var meshes = SurfaceNets.Generate(chunk, obj);
+            Debug.Log($"Meshes: {meshes.Count}");
+            foreach (var mesh in meshes)
+            {
+                /* Gather a pooled mesh */
+                var mf = MeshPool.Instance.MeshFilterPool.Get();
+                mf.mesh = mesh;
+                currFilters.Add(mf);
+            }
         }
 
         private List<List<SurfacePoint>> edges;
@@ -93,33 +112,33 @@ namespace ethanr_utils.dual_contouring
                     }
                 }
                 
-                /* Voxel */
-                edges = SurfaceNets.Generate(chunk, obj);
-                
-                if (edges != null)
-                {
-                    Gizmos.color = Color.green;
-                    foreach (var polygon in edges)
-                    {
-                        for (int i = 0; i < polygon.Count-1; i++)
-                        {
-                            Gizmos.DrawLine(polygon[i].Position, polygon[i + 1].Position);
-                        }
-                        Gizmos.DrawLine(polygon[0].Position, polygon[^1].Position);
-                    }
-                    // string surfaceIDs = "";
-                    // foreach (var surface in edges)
-                    // { 
-                    //     surfaceIDs += surface[0].SurfaceID + ", ";
-                    //     var surfaceColor = Color.HSVToRGB(Random.Range(0.0f, 1.0f), 1.0f, 1.0f);
-                    //     foreach (var point in surface)
-                    //     {
-                    //         Gizmos.color = surfaceColor;
-                    //         Gizmos.DrawSphere(point.Position.ToVector3WithZ(-0.05f), 0.05f);
-                    //     }
-                    // }
-                    // Debug.Log(surfaceIDs);
-                }
+                // /* Voxel */
+                // edges = SurfaceNets.Generate(chunk, obj);
+                //
+                // if (edges != null)
+                // {
+                //     Gizmos.color = Color.green;
+                //     foreach (var polygon in edges)
+                //     {
+                //         for (int i = 0; i < polygon.Count-1; i++)
+                //         {
+                //             Gizmos.DrawLine(polygon[i].Position, polygon[i + 1].Position);
+                //         }
+                //         Gizmos.DrawLine(polygon[0].Position, polygon[^1].Position);
+                //     }
+                //     // string surfaceIDs = "";
+                //     // foreach (var surface in edges)
+                //     // { 
+                //     //     surfaceIDs += surface[0].SurfaceID + ", ";
+                //     //     var surfaceColor = Color.HSVToRGB(Random.Range(0.0f, 1.0f), 1.0f, 1.0f);
+                //     //     foreach (var point in surface)
+                //     //     {
+                //     //         Gizmos.color = surfaceColor;
+                //     //         Gizmos.DrawSphere(point.Position.ToVector3WithZ(-0.05f), 0.05f);
+                //     //     }
+                //     // }
+                //     // Debug.Log(surfaceIDs);
+                // }
                 
             }
         }
