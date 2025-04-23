@@ -353,55 +353,62 @@ namespace ethanr_utils.dual_contouring.computation
         /// <returns></returns>
         private static List<Contour> ComposeContours(List<Contour> allContours)
         {
-            /* Find and remove all outer contours */
-            List<Contour> outerContours = new List<Contour>();
-            foreach (var contour in allContours)
+            /* First, determine containment lists for all contours */
+            Dictionary<Contour, List<Contour>> containment = new Dictionary<Contour, List<Contour>>();
+            foreach (var a in allContours)
             {
-                if (contour.OrderIsClockwise())
-                {
-                    outerContours.Add(contour);
-                }
-            }
-            allContours.RemoveAll(c => outerContours.Contains(c));
-        
-            /* For the remaining contours, use bounding boxes to figure out which body they should be a part of */
-            /* Prioritize smallest */
-            foreach (var contour in allContours)
-            {
-                /* Get this contours bounding box */
-                var bb = contour.GetBoundingBox();
+                containment[a] = new List<Contour>();
                 
-                /* Figure out which outer contours might contain this hole */
-                Contour parent = null;
-                foreach (var outer in outerContours)
+                foreach (var b in allContours)
                 {
-                    var outerBB = outer.GetBoundingBox();
-                    if (!outerBB.Contains(bb.min) || !outerBB.Contains(bb.max)) continue;
-                    if (parent == null)
+                    /* No dual case */
+                    if (a == b) continue;
+                    
+                    /* Check confinement */
+                    if (b.ContainsPoint(a.Data[0].Position))
                     {
-                        parent = outer;
-                    }
-                    else
-                    {
-                        var parentSize = parent.GetBoundingBox().size.x * parent.GetBoundingBox().size.y;
-                        if (parentSize > outerBB.size.x * outerBB.size.y)
-                        {
-                                
-                            parent = outer;
-                        }
+                        containment[a].Add(b);
                     }
                 }
-                
-                /* Fill the hole */
-                if (parent == null)
-                {
-                    Debug.Log(contour.DumpPoints());
-                    Debug.LogError("Unable to compose contours...");
-                }
-                parent.Holes.Add(contour);
             }
             
-            return outerContours;
+            /* Now, iteratively resolve the hierarchy of surfaces */
+            HashSet<Contour> open = new HashSet<Contour>();
+            HashSet<Contour> closed = new HashSet<Contour>();
+            foreach (var contour in containment.Keys)
+            {
+                if (containment[contour].Count == 0)
+                {
+                    closed.Add(contour);
+                    contour.Parent = null;
+                }
+                else
+                {
+                    open.Add(contour);
+                }
+            }
+
+            while (open.Count > 0)
+            {
+                /* Find the contours with only one resolved parent */
+                var toClose = new List<Contour>();
+                foreach (var contour in open)
+                {
+                    if (containment[contour].Count == 1 && closed.Contains(containment[contour][0]))
+                    {
+                        toClose.Add(contour);
+                    }
+                }
+                
+                /* Move these contours to closed */
+                /* Mark
+                foreach (var contour in toClose)
+                {
+                    open.Remove(contour);
+                    closed.Add(contour);
+                }
+            }
+            
         }
 
         /// <summary>

@@ -21,6 +21,11 @@ namespace ethanr_utils.dual_contouring.data
         public List<Contour> Holes = new();
 
         /// <summary>
+        /// The contour which contains this contour (null implies no containing contour */
+        /// </summary>
+        public Contour Parent;
+
+        /// <summary>
         /// Arrange the various points within this contour into order.
         /// </summary>
         public void AssembleContour(SdfOperator sdf)
