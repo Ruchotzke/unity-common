@@ -20,7 +20,7 @@ namespace ethanr_utils.dual_contouring
         [SerializeField] private float rotation = 4.6f;
         [SerializeField] private float scale = 1.0f;
 
-        private int size = 6;
+        private int size = 9;
         private Rect area = new Rect(0.0f, 0.0f, 4.0f, 4.0f);
         private SdfObject obj;
         

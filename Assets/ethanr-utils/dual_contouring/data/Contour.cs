@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using ethanr_utils.dual_contouring.csg_ops;
 using UnityEngine;
+using UnityUtilities.General;
 
 namespace ethanr_utils.dual_contouring.data
 {
@@ -124,7 +125,7 @@ namespace ethanr_utils.dual_contouring.data
         /// <returns></returns>
         public bool OrderIsClockwise()
         {
-            return DoesOrderWindClockwise(Data[0], Data[1], Data[2]);
+            return SignedArea.ComputeSignedArea(this) < 0;
         }
         
         /// <summary>
@@ -158,6 +159,57 @@ namespace ethanr_utils.dual_contouring.data
             var area = ((a.Position.x * (b.Position.y - c.Position.y)) + (b.Position.x * (c.Position.y - a.Position.y)) + (c.Position.x * (a.Position.y - b.Position.y)));
 
             return area < 0;
+        }
+
+        /// <summary>
+        /// Test whether a supplied point is contained within this contour.
+        /// </summary>
+        /// <param name="point"></param>
+        /// <returns></returns>
+        public bool ContainsPoint(Vector2 point)
+        {
+            /* Check each edge: we're raycasting to the right. */
+            var intersections = 0;
+            for (var i = 0; i < Data.Count - 1; i++)
+            {
+                var a = Data[i].Position;
+                var b = Data[i + 1].Position;
+                
+                // Check if the horizontal ray from point intersects edge (v1,v2)
+                var cond1 = (a.y > point.y) != (b.y > point.y);
+                if (!cond1) continue;
+                var xIntersect = a.x + (point.y - a.y) * (b.x - a.x) / (b.y - a.y);
+                if (xIntersect > point.x)
+                {
+                    intersections++;
+                }
+            }
+            
+            /* And the final edge */
+            var aa = Data[^1].Position;
+            var bb = Data[0].Position;
+            var cond11 = (aa.y > point.y) != (bb.y > point.y);
+            if (cond11)
+            {
+                var xIntersect = aa.x + (point.y - aa.y) * (bb.x - aa.x) / (bb.y - aa.y);
+                if (xIntersect > point.x)
+                {
+                    intersections++;
+                }
+            }
+
+            return intersections % 2 == 1;
+        }
+
+        public string DumpPoints()
+        {
+            var ret = "";
+            foreach (var point in Data)
+            {
+                ret += $"({point.Position.x}, {point.Position.y})\n";
+            }
+
+            return ret;
         }
     }
 }

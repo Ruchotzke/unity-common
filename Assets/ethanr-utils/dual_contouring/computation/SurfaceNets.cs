@@ -395,6 +395,7 @@ namespace ethanr_utils.dual_contouring.computation
                 /* Fill the hole */
                 if (parent == null)
                 {
+                    Debug.Log(contour.DumpPoints());
                     Debug.LogError("Unable to compose contours...");
                 }
                 parent.Holes.Add(contour);
