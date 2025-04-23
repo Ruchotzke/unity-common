@@ -6,6 +6,8 @@ using TriangleNet.Geometry;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityUtilities.Meshing;
+using Contour = ethanr_utils.dual_contouring.data.Contour;
+using TriContour = TriangleNet.Geometry.Contour;
 
 namespace ethanr_utils.dual_contouring.computation
 {
@@ -22,7 +24,7 @@ namespace ethanr_utils.dual_contouring.computation
         /// </summary>
         /// <param name="chunk"></param>
         /// <returns></returns>
-        public static List<Mesh> Generate(VolumeChunk chunk, SdfOperator sdf)
+        public static (List<Mesh> meshes, List<Contour> contours) Generate(VolumeChunk chunk, SdfOperator sdf)
         {
             /* SYNC POINT: Sampling data provided */
             /* GOAL: Compute all intersections and normals */
@@ -288,30 +290,46 @@ namespace ethanr_utils.dual_contouring.computation
             
             /* SYNC POINT - All edges have been enumerated and points tagged */
             /* GOAL: Put connected isosurfaces into their own polygons */
-            var surfaces = GenerateSurfaces(allSurfacePoints);
-            var polygons = GeneratePolygons(surfaces);
+            var contours = GenerateSurfaces(allSurfacePoints);
+            
+            /* Make sure contours are in order */
+            foreach (var contour in contours)
+            {
+                contour.AssembleContour(sdf);
+            }
+            
+            /* Compose inner contours into outer contours */
+            var outerContours = ComposeContours(contours);
             
             /* SYNC POINT - All voxel data has been encoded into polygons */
             /* GOAL: Generate a mesh */
 
-            return GenerateMeshes(polygons);
+            return (GenerateMeshes(outerContours), outerContours);
         }
 
         /// <summary>
         /// Triangulate all of the provided meshes from their polygons.
         /// </summary>
-        /// <param name="polygons"></param>
+        /// <param name="outerContours"></param>
         /// <returns></returns>
-        private static List<Mesh> GenerateMeshes(List<List<SurfacePoint>> polygons)
+        private static List<Mesh> GenerateMeshes(List<Contour> outerContours)
         {
             List<Mesh> meshes = new List<Mesh>();
             
-            foreach (var polygon in polygons)
+            foreach (var contour in outerContours)
             {
                 /* Generate the triangulation */
                 var tripoly = new Polygon();
-                var vertices = GenerateVertices(polygon);
-                tripoly.Add(new Contour(vertices));
+                var vertices = GenerateVertices(contour);
+                tripoly.Add(new TriContour(vertices));
+                
+                /* Add all holes */
+                foreach (var hole in contour.Holes)
+                {
+                    var holeVerts = GenerateVertices(hole);
+                    tripoly.Add(new TriContour(holeVerts), true);
+                }
+                
                 var triangulation = tripoly.Triangulate();
                 
                 /* Generate and save the mesh */
@@ -328,15 +346,73 @@ namespace ethanr_utils.dual_contouring.computation
         }
 
         /// <summary>
+        /// Compose inner contours into outer contours.
+        /// Output list only contains outer contours, and each outer contour references its own holes.
+        /// </summary>
+        /// <param name="allContours"></param>
+        /// <returns></returns>
+        private static List<Contour> ComposeContours(List<Contour> allContours)
+        {
+            /* Find and remove all outer contours */
+            List<Contour> outerContours = new List<Contour>();
+            foreach (var contour in allContours)
+            {
+                if (contour.OrderIsClockwise())
+                {
+                    outerContours.Add(contour);
+                }
+            }
+            allContours.RemoveAll(c => outerContours.Contains(c));
+        
+            /* For the remaining contours, use bounding boxes to figure out which body they should be a part of */
+            /* Prioritize smallest */
+            foreach (var contour in allContours)
+            {
+                /* Get this contours bounding box */
+                var bb = contour.GetBoundingBox();
+                
+                /* Figure out which outer contours might contain this hole */
+                Contour parent = null;
+                foreach (var outer in outerContours)
+                {
+                    var outerBB = outer.GetBoundingBox();
+                    if (!outerBB.Contains(bb.min) || !outerBB.Contains(bb.max)) continue;
+                    if (parent == null)
+                    {
+                        parent = outer;
+                    }
+                    else
+                    {
+                        var parentSize = parent.GetBoundingBox().size.x * parent.GetBoundingBox().size.y;
+                        if (parentSize > outerBB.size.x * outerBB.size.y)
+                        {
+                                
+                            parent = outer;
+                        }
+                    }
+                }
+                
+                /* Fill the hole */
+                if (parent == null)
+                {
+                    Debug.LogError("Unable to compose contours...");
+                }
+                parent.Holes.Add(contour);
+            }
+            
+            return outerContours;
+        }
+
+        /// <summary>
         /// Helper to convert our points into vertices for trianglenet
         /// </summary>
         /// <param name="contour"></param>
         /// <returns></returns>
-        private static List<Vertex> GenerateVertices(List<SurfacePoint> contour)
+        private static List<Vertex> GenerateVertices(Contour contour)
         {
             List<Vertex> vertices = new List<Vertex>();
 
-            foreach (var contourPoint in contour)
+            foreach (var contourPoint in contour.Data)
             {
                 vertices.Add(new Vertex(contourPoint.Position.x, contourPoint.Position.y));
             }
@@ -344,93 +420,26 @@ namespace ethanr_utils.dual_contouring.computation
             return vertices;
         }
 
-        /// <summary>
-        /// Generated ordered polygons from the provided sets of surface point.
-        /// </summary>
-        /// <param name="surfaces"></param>
-        /// <returns></returns>
-        private static List<List<SurfacePoint>> GeneratePolygons(List<List<SurfacePoint>> surfaces)
-        {
-            List<List<SurfacePoint>> polygons = new List<List<SurfacePoint>>();
-
-            foreach (var surface in surfaces)
-            {
-                List<SurfacePoint> polygon = new List<SurfacePoint>();
-
-                /* Use BFS to build an ordered loop */
-                Queue<SurfacePoint> queue = new Queue<SurfacePoint>();
-                queue.Enqueue(surface[0]);
-                surface.RemoveAt(0);
-
-                /* BFS */
-                while (queue.Count > 0)
-                {
-                    /* Grab the next entry */
-                    var curr = queue.Dequeue();
-                    
-                    /* Add neighbors if they haven't been added yet */
-                    foreach (var neighbor in curr.Adjacent)
-                    {
-                        if (!surface.Contains(neighbor)) continue;
-                        queue.Enqueue(neighbor);
-                        surface.Remove(neighbor);
-                    }
-                    
-                    /* Place this vertex into the loop appropriately. */
-                    if (polygon.Count == 0)
-                    {
-                        polygon.Add(curr);
-                    }
-                    else
-                    {
-                        if (polygon[0].Adjacent.Contains(curr)) // first entry
-                        {
-                            polygon.Insert(0, curr);
-                        }
-                        else if (polygon[^1].Adjacent.Contains(curr)) // insertion entry
-                        {
-                            polygon.Add(curr);
-                        }
-                        else // uh oh
-                        {
-                            /* Whoa! This isn't connected... */
-                            Debug.LogError($"Missing connected vertex for {curr}");
-                        }
-                    }
-                }
-                
-                /* If this surface still has points, something went wrong */
-                if (surface.Count > 0)
-                {
-                    Debug.LogError("Unable to assemble polygon from surface.");
-                }
-                
-                polygons.Add(polygon);
-            }
-
-            return polygons;
-        }
-
-        private static List<List<SurfacePoint>> GenerateSurfaces(List<SurfacePoint> surfacePoints)
+        private static List<Contour> GenerateSurfaces(List<SurfacePoint> surfacePoints)
         {
             /* Each only belongs to one surface */
             HashSet<SurfacePoint> open = new HashSet<SurfacePoint>();
             open.AddRange(surfacePoints);
             
-            var surfaces = new List<List<SurfacePoint>>();
+            var surfaces = new List<Contour>();
             uint id = 1;    
             
             while (open.Count > 0)
             {
-                var currSurface = new List<SurfacePoint>();
+                var currSurface = new Contour();
                 foreach (var point in open)
                 {
                     if (point.SurfaceID == id)
                     {
-                        currSurface.Add(point);
+                        currSurface.Data.Add(point);
                     }
                 }
-                open.RemoveWhere(s => currSurface.Contains(s));
+                open.RemoveWhere(s => currSurface.Data.Contains(s));
                 
                 surfaces.Add(currSurface);
                 if(open.Count > 0) id = open.First().SurfaceID;

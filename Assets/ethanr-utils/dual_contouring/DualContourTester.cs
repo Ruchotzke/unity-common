@@ -20,24 +20,25 @@ namespace ethanr_utils.dual_contouring
         [SerializeField] private float rotation = 4.6f;
         [SerializeField] private float scale = 1.0f;
 
-        private int size = 16;
+        private int size = 6;
         private Rect area = new Rect(0.0f, 0.0f, 4.0f, 4.0f);
         private SdfObject obj;
         
         private List<MeshFilter> currFilters = new List<MeshFilter>();
+        private List<List<SurfacePoint>> polygons = new List<List<SurfacePoint>>();
         
         private void Awake()
         {
-            // chunk = new VolumeChunk(new Vector2Int(size, size), area);
-            // var largerCircle = new CircleSdf(1.5f);
-            // var smallerCircle = new CircleSdf(.75f);
-            // var torus = new DifferenceSdf(largerCircle, smallerCircle);
-            // obj = new SdfObject(torus);
+            chunk = new VolumeChunk(new Vector2Int(size, size), area);
+            var largerCircle = new CircleSdf(1.5f);
+            var smallerCircle = new CircleSdf(.75f);
+            var torus = new DifferenceSdf(largerCircle, smallerCircle);
+            obj = new SdfObject(torus);
             
-            var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
-            var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
-            var union = new UnionSdf(r1, r2);
-            obj = new SdfObject(union);
+            // var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
+            // var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
+            // var union = new UnionSdf(r1, r2);
+            // obj = new SdfObject(union);
 
             // var rect = new RectSdf(new Vector2(3.0f, 2.0f));
             // var rectObj = new SdfObject(rect);
@@ -82,15 +83,15 @@ namespace ethanr_utils.dual_contouring
             }
             
             /* Render the meshes */
-            var meshes = SurfaceNets.Generate(chunk, obj);
-            Debug.Log($"Meshes: {meshes.Count}");
-            foreach (var mesh in meshes)
+            var output = SurfaceNets.Generate(chunk, obj);
+            foreach (var mesh in output.meshes)
             {
                 /* Gather a pooled mesh */
                 var mf = MeshPool.Instance.MeshFilterPool.Get();
                 mf.mesh = mesh;
                 currFilters.Add(mf);
             }
+            // polygons = output.polygons;
         }
 
         private List<List<SurfacePoint>> edges;
@@ -99,6 +100,7 @@ namespace ethanr_utils.dual_contouring
         {
             if (Application.isPlaying)
             {
+                /* Render the underlying data */
                 if (chunk != null)
                 {
                     for (int x = 0; x < chunk.Points.GetLength(0); x++)
@@ -107,11 +109,29 @@ namespace ethanr_utils.dual_contouring
                         {
                             /* Underlying sample */
                             Gizmos.color = chunk.Points[x,y].SampleValue <= 0.0f ? Color.red : Color.black;
-                            Gizmos.DrawSphere(chunk.VoxelToWorld(new Vector2Int(x, y)), 0.1f);
+                            Gizmos.DrawSphere(chunk.VoxelToWorld(new Vector2Int(x, y)), 0.05f);
                         }
                     }
                 }
                 
+                /* Render the polygons */
+                foreach (var polygon in polygons)
+                {
+                    for (int i = 0; i < polygon.Count-1; i++)
+                    {
+                        Gizmos.color = Color.green;
+                        Gizmos.DrawLine(polygon[i].Position, polygon[i + 1].Position);
+                        var lerpPoint = Vector2.Lerp(polygon[i].Position, polygon[i + 1].Position, 0.8f);
+                        Gizmos.color = Color.magenta;
+                        Gizmos.DrawCube(lerpPoint, Vector3.one * 0.05f);
+                    }
+                    Gizmos.color = Color.green;
+                    Gizmos.DrawLine(polygon[0].Position, polygon[^1].Position);
+                    Gizmos.color = Color.magenta;
+                    var finalLerp = Vector2.Lerp(polygon[^1].Position, polygon[0].Position, 0.8f);
+                    Gizmos.DrawCube(finalLerp, Vector3.one * 0.05f);
+                }
+
                 // /* Voxel */
                 // edges = SurfaceNets.Generate(chunk, obj);
                 //
@@ -139,7 +159,7 @@ namespace ethanr_utils.dual_contouring
                 //     // }
                 //     // Debug.Log(surfaceIDs);
                 // }
-                
+
             }
         }
     }
