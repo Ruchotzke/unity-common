@@ -69,7 +69,7 @@ namespace ethanr_utils.dual_contouring.computation
             
             /* SYNC POINT - All edge/intersection data computed */
             /* GOAL: Map voxels to singular edge point */
-            var surfacePoints = new Dictionary<Vector2Int, SurfacePoint>(); // store all surface points computed
+            var surfacePoints = new Dictionary<Vector2Int, List<(bool? isLowerLeft, SurfacePoint point)>>(); // store all surface points computed
             var surfaceEdges = new List<(Vector2Int a, Vector2Int b, EdgeContainer.EdgeDirection dir)>(); // store all edges the surface passes through
             
             /* For each voxel, we can compute one singular internal point */
@@ -78,6 +78,8 @@ namespace ethanr_utils.dual_contouring.computation
                 for (int y = 0; y < chunk.Points.GetLength(1) - 1; y++)
                 {
                     var voxel = new Vector2Int(x, y);
+                    var currList = new List<(bool? isLowerLeft, SurfacePoint point)>();
+                    surfacePoints.Add(voxel, currList);
                     
                     /* Grab all intersection points */
                     var isctPoints = new List<Vector2>();
@@ -120,16 +122,30 @@ namespace ethanr_utils.dual_contouring.computation
                             continue;
                         case 2:
                             /* Normal case - average */
-                            surfacePoints.Add(voxel, new SurfacePoint
+                            currList.Add((null, new SurfacePoint
                             {
                                 Position = (isctPoints[0] + isctPoints[1]) * 0.5f,
                                 SurfaceID = 0,
                                 Adjacent = new List<SurfacePoint>()
-                            } );
+                            }));
                             break;
                         case 4:
                             /* Saddle point - weird */
-                            Debug.LogWarning($"Saddle Point...");
+                            //TODO: Find a less arbitrary way to handle saddles.
+                            // Debug.LogWarning($"Saddle Point...");
+                            /* Generate two surface points for this voxel */
+                            currList.Add((true, new SurfacePoint
+                            {
+                                Position = (isctPoints[0] + isctPoints[1]) * 0.5f,
+                                SurfaceID = 0,
+                                Adjacent = new List<SurfacePoint>()
+                            } ));
+                            currList.Add((false, new SurfacePoint
+                            {
+                                Position = (isctPoints[2] + isctPoints[3]) * 0.5f,
+                                SurfaceID = 0,
+                                Adjacent = new List<SurfacePoint>()
+                            } ));
                             break;
                         default:
                             Debug.LogError($"Unable to process voxel with {isctPoints.Count} intersections...");
@@ -154,7 +170,9 @@ namespace ethanr_utils.dual_contouring.computation
                         if (voxelEdge.a.x == 0)
                         {
                             /* Left border */
-                            var innerPoint = surfacePoints[voxelEdge.a];
+                            var innerPoint = from entry in surfacePoints[voxelEdge.a]
+                                where entry.isLowerLeft == null || entry.isLowerLeft.Value
+                                    select entry;
                             if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out var isct))
                             {
                                 Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
@@ -169,13 +187,16 @@ namespace ethanr_utils.dual_contouring.computation
                             };
 
                             mapBoundaryPoints.AddLeftBorder(edgePoint, sdf.SampleNormal(edgePoint.Position));
-                            edgePoint.Adjacent.Add(innerPoint);
-                            innerPoint.Adjacent.Add(edgePoint);
+                            var point = innerPoint.First().point;
+                            edgePoint.Adjacent.Add(point);
+                            point.Adjacent.Add(edgePoint);
                         }
                         else
                         {
                             /* Right border */
-                            var innerPoint = surfacePoints[voxelEdge.a + Vector2Int.left];
+                            var innerPoint = from entry in surfacePoints[voxelEdge.a + Vector2Int.left]
+                                where entry.isLowerLeft == null || !entry.isLowerLeft.Value
+                                    select entry;
                             if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out var isct))
                             {
                                 Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
@@ -190,8 +211,9 @@ namespace ethanr_utils.dual_contouring.computation
                             };
 
                             mapBoundaryPoints.AddRightBorder(edgePoint, sdf.SampleNormal(edgePoint.Position));
-                            edgePoint.Adjacent.Add(innerPoint);
-                            innerPoint.Adjacent.Add(edgePoint);
+                            var point = innerPoint.First().point;
+                            edgePoint.Adjacent.Add(point);
+                            point.Adjacent.Add(edgePoint);
                         }
                     }
                     else if (voxelEdge.dir == EdgeContainer.EdgeDirection.Right)
@@ -199,7 +221,9 @@ namespace ethanr_utils.dual_contouring.computation
                         if (voxelEdge.a.y == 0)
                         {
                             /* Bottom border */
-                            var innerPoint = surfacePoints[voxelEdge.a];
+                            var innerPoint = from entry in surfacePoints[voxelEdge.a]
+                                where entry.isLowerLeft == null || entry.isLowerLeft.Value
+                                    select entry;
                             if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out var isct))
                             {
                                 Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
@@ -214,13 +238,16 @@ namespace ethanr_utils.dual_contouring.computation
                             };
 
                             mapBoundaryPoints.AddBottomBorder(edgePoint, sdf.SampleNormal(edgePoint.Position));
-                            edgePoint.Adjacent.Add(innerPoint);
-                            innerPoint.Adjacent.Add(edgePoint);
+                            var point = innerPoint.First().point;
+                            edgePoint.Adjacent.Add(point);
+                            point.Adjacent.Add(edgePoint);
                         }
                         else
                         {
                             /* Top border */
-                            var innerPoint = surfacePoints[voxelEdge.a + Vector2Int.down];
+                            var innerPoint = from entry in surfacePoints[voxelEdge.a + Vector2Int.down]
+                                where entry.isLowerLeft == null || !entry.isLowerLeft.Value
+                                    select entry;
                             if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out var isct))
                             {
                                 Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
@@ -235,8 +262,9 @@ namespace ethanr_utils.dual_contouring.computation
                             };
 
                             mapBoundaryPoints.AddTopBorder(edgePoint, sdf.SampleNormal(edgePoint.Position));
-                            edgePoint.Adjacent.Add(innerPoint);
-                            innerPoint.Adjacent.Add(edgePoint);
+                            var point = innerPoint.First().point;
+                            edgePoint.Adjacent.Add(point);
+                            point.Adjacent.Add(edgePoint);
                         }
                     }
                     else
@@ -250,18 +278,16 @@ namespace ethanr_utils.dual_contouring.computation
                     if (voxelEdge.dir == EdgeContainer.EdgeDirection.Up)
                     {
                         var leftVoxel = voxelEdge.a + Vector2Int.left;
-                        var a = surfacePoints[leftVoxel];
-                        var b = surfacePoints[voxelEdge.a];
-                        a.Adjacent.Add(b);
-                        b.Adjacent.Add(a);
+                        var left = surfacePoints[leftVoxel];
+                        var right = surfacePoints[voxelEdge.a];
+                        ConnectVoxelsUp(left, right);
                     }
                     else if (voxelEdge.dir == EdgeContainer.EdgeDirection.Right)
                     {
                         var botVoxel = voxelEdge.a + Vector2Int.down;
-                        var a = surfacePoints[botVoxel];
-                        var b = surfacePoints[voxelEdge.a];
-                        a.Adjacent.Add(b);
-                        b.Adjacent.Add(a);
+                        var bot = surfacePoints[botVoxel];
+                        var top = surfacePoints[voxelEdge.a];
+                        ConnectVoxelsRight(bot, top);
                     }
                     else
                     {
@@ -282,8 +308,11 @@ namespace ethanr_utils.dual_contouring.computation
             mapBoundaryPoints.ConnectEdges();
             
             /* Tag/fill in surface IDs of all points */
-            List<SurfacePoint> allSurfacePoints = new List<SurfacePoint>();
-            allSurfacePoints.AddRange(surfacePoints.Values);
+            var allSurfacePoints = new List<SurfacePoint>();
+            foreach (var points in surfacePoints.Values)
+            {
+                allSurfacePoints.AddRange(points.Select(point => point.point));
+            }
             allSurfacePoints.AddRange(mapBoundaryPoints.GetAll());
             allSurfacePoints.AddRange(cornerList);
             FloodFillSurfaces(allSurfacePoints);
@@ -620,6 +649,118 @@ namespace ethanr_utils.dual_contouring.computation
             }
 
             return t;
+        }
+
+        /// <summary>
+        /// Connect up the two voxels when their connecting edge is vertical.
+        /// </summary>
+        /// <param name="left"></param>
+        /// <param name="right"></param>
+        private static void ConnectVoxelsUp(List<(bool? isLowerLeft, SurfacePoint point)> left,
+            List<(bool? isLowerLeft, SurfacePoint point)> right)
+        {
+            SurfacePoint leftChoice = null;
+            SurfacePoint rightChoice = null;
+            
+            /* Find the two vertices to link */
+            switch (left.Count)
+            {
+                case 1:
+                    leftChoice = left[0].point;
+                    switch (right.Count)
+                    {
+                        case 1:
+                            rightChoice = right[0].point;
+                            break;
+                        case 2:
+                            var rightPoint = from entry in right where entry.isLowerLeft != null && (bool)entry.isLowerLeft select entry;
+                            rightChoice = rightPoint.First().point;
+                            break;
+                        default:
+                            Debug.LogError($"Right voxel has {right.Count} surface points, which is not expected.");
+                            break;
+                    }
+                    break;
+                case 2:
+                    var leftPoint = from entry in left where entry.isLowerLeft != null && (bool)!entry.isLowerLeft select entry;
+                    leftChoice = leftPoint.First().point;
+                    switch (right.Count)
+                    {
+                        case 1:
+                            rightChoice = right[0].point;
+                            break;
+                        case 2:
+                            var rightPoint = from entry in right where entry.isLowerLeft != null && (bool)entry.isLowerLeft select entry;
+                            rightChoice = rightPoint.First().point;
+                            break;
+                        default:
+                            Debug.LogError($"Right voxel has {right.Count} surface points, which is not expected.");
+                            break;
+                    }
+                    break;
+                default:
+                    Debug.LogError($"Left voxel has {left.Count} surface points, which is not expected.");
+                    break;
+            }
+            
+            /* Connect up the two verts */
+            leftChoice.Adjacent.Add(rightChoice);
+            rightChoice.Adjacent.Add(leftChoice);
+        }
+        
+        /// <summary>
+        /// Connect up the two voxels when their connecting edge is horizontal.
+        /// </summary>
+        private static void ConnectVoxelsRight(List<(bool? isLowerLeft, SurfacePoint point)> bot,
+            List<(bool? isLowerLeft, SurfacePoint point)> top)
+        {
+            SurfacePoint botChoice = null;
+            SurfacePoint topChoice = null;
+            
+            /* Find the two vertices to link */
+            switch (bot.Count)
+            {
+                case 1:
+                    botChoice = bot[0].point;
+                    switch (top.Count)
+                    {
+                        case 1:
+                            topChoice = top[0].point;
+                            break;
+                        case 2:
+                            var rightPoint = from entry in top where entry.isLowerLeft != null && (bool)entry.isLowerLeft select entry;
+                            topChoice = rightPoint.First().point;
+                            break;
+                        default:
+                            Debug.LogError($"Top voxel has {top.Count} surface points, which is not expected.");
+                            break;
+                    }
+                    break;
+                case 2:
+                    var botPoint = from entry in bot where entry.isLowerLeft != null && (bool)!entry.isLowerLeft select entry;
+                    botChoice = botPoint.First().point;
+                    switch (top.Count)
+                    {
+                        case 1:
+                            topChoice = top[0].point;
+                            break;
+                        case 2:
+                            var rightPoint = from entry in top where entry.isLowerLeft != null && (bool)entry.isLowerLeft select entry;
+                            topChoice = rightPoint.First().point;
+                            break;
+                        default:
+                            Debug.LogError($"Top voxel has {top.Count} surface points, which is not expected.");
+                            break;
+                    }
+                    break;
+                default:
+                    Debug.LogError($"Bot voxel has {bot.Count} surface points, which is not expected.");
+                    break;
+            }
+            
+            /* Connect up the two verts */
+            botChoice.Adjacent.Add(topChoice);
+            topChoice.Adjacent.Add(botChoice);
         }
     }
 }

@@ -89,13 +89,13 @@ namespace ethanr_utils.dual_contouring.data
             }
             foreach (var bottom in bottomBorders)
             {
-                if(botMin == null || botMin.Value.point.Position.y > bottom.point.Position.y) botMin = bottom;
-                if(botMax == null || botMax.Value.point.Position.y < bottom.point.Position.y) botMax = bottom;
+                if(botMin == null || botMin.Value.point.Position.x > bottom.point.Position.x) botMin = bottom;
+                if(botMax == null || botMax.Value.point.Position.x < bottom.point.Position.x) botMax = bottom;
             }
             foreach (var top in topBorders)
             {
-                if(topMin == null || topMin.Value.point.Position.y > top.point.Position.y) topMin = top;
-                if(topMax == null || topMax.Value.point.Position.y < top.point.Position.y) topMax = top;
+                if(topMin == null || topMin.Value.point.Position.x > top.point.Position.x) topMin = top;
+                if(topMax == null || topMax.Value.point.Position.x < top.point.Position.x) topMax = top;
             }
             
             /* Using sampling we can compute whether the corners are contained or not */

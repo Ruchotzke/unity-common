@@ -149,7 +149,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   update: 1
-  position: {x: 1.61, y: 2.01}
+  position: {x: 3.16, y: 3.07}
   rotation: 0
   scale: 1
 --- !u!4 &43067942
