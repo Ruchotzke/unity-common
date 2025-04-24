@@ -206,6 +206,15 @@ namespace ethanr_utils.dual_contouring.data
             return intersections % 2 == 1;
         }
 
+        /// <summary>
+        /// Get the depth of this contour in terms of parental depth.
+        /// </summary>
+        /// <returns></returns>
+        public int GetDepth()
+        {
+            return Parent == null ? 0 : Parent.GetDepth() + 1;
+        }
+
         public string DumpPoints()
         {
             var ret = "";

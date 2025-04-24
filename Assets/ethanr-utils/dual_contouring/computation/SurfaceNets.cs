@@ -299,12 +299,12 @@ namespace ethanr_utils.dual_contouring.computation
             }
             
             /* Compose inner contours into outer contours */
-            var outerContours = ComposeContours(contours);
+            ComposeContours(contours);
             
             /* SYNC POINT - All voxel data has been encoded into polygons */
             /* GOAL: Generate a mesh */
 
-            return (GenerateMeshes(outerContours), outerContours);
+            return (GenerateMeshes(contours), contours);
         }
 
         /// <summary>
@@ -312,24 +312,29 @@ namespace ethanr_utils.dual_contouring.computation
         /// </summary>
         /// <param name="outerContours"></param>
         /// <returns></returns>
-        private static List<Mesh> GenerateMeshes(List<Contour> outerContours)
+        private static List<Mesh> GenerateMeshes(List<Contour> contours)
         {
             List<Mesh> meshes = new List<Mesh>();
             
-            foreach (var contour in outerContours)
+            /* We need to make a mesh for each even depth contour */
+            List<Contour> evenDepth = contours.Where(contour => contour.GetDepth() % 2 == 0).ToList();
+            
+            /* Now make a mesh for each */
+            foreach (var contour in evenDepth)
             {
-                /* Generate the triangulation */
+                /* Generate a parent polygon */
                 var tripoly = new Polygon();
                 var vertices = GenerateVertices(contour);
                 tripoly.Add(new TriContour(vertices));
                 
-                /* Add all holes */
+                /* Add any holes */
                 foreach (var hole in contour.Holes)
                 {
                     var holeVerts = GenerateVertices(hole);
                     tripoly.Add(new TriContour(holeVerts), true);
                 }
                 
+                /* Triangulate */
                 var triangulation = tripoly.Triangulate();
                 
                 /* Generate and save the mesh */
@@ -347,11 +352,10 @@ namespace ethanr_utils.dual_contouring.computation
 
         /// <summary>
         /// Compose inner contours into outer contours.
-        /// Output list only contains outer contours, and each outer contour references its own holes.
         /// </summary>
         /// <param name="allContours"></param>
         /// <returns></returns>
-        private static List<Contour> ComposeContours(List<Contour> allContours)
+        private static void ComposeContours(List<Contour> allContours)
         {
             /* First, determine containment lists for all contours */
             Dictionary<Contour, List<Contour>> containment = new Dictionary<Contour, List<Contour>>();
@@ -375,11 +379,15 @@ namespace ethanr_utils.dual_contouring.computation
             /* Now, iteratively resolve the hierarchy of surfaces */
             HashSet<Contour> open = new HashSet<Contour>();
             HashSet<Contour> closed = new HashSet<Contour>();
+            List<Contour> outer = new List<Contour>();
+            
+            /* Start by putting contours into open/closed categories, with outer contours closed immediately */
             foreach (var contour in containment.Keys)
             {
                 if (containment[contour].Count == 0)
                 {
                     closed.Add(contour);
+                    outer.Add(contour);
                     contour.Parent = null;
                 }
                 else
@@ -387,28 +395,48 @@ namespace ethanr_utils.dual_contouring.computation
                     open.Add(contour);
                 }
             }
-
+            
+            /* Continue to resolve until all contours are taken care of */
             while (open.Count > 0)
             {
-                /* Find the contours with only one resolved parent */
-                var toClose = new List<Contour>();
+                /* Iterate through all open contours */
+                /* Determine which can be closed (any whose parents are all resolved) */
+                HashSet<Contour> canBeClosed = new HashSet<Contour>();
                 foreach (var contour in open)
                 {
-                    if (containment[contour].Count == 1 && closed.Contains(containment[contour][0]))
-                    {
-                        toClose.Add(contour);
-                    }
+                    var resolved = containment[contour].All(container => closed.Contains(container));
+
+                    if (resolved) canBeClosed.Add(contour);
                 }
                 
-                /* Move these contours to closed */
-                /* Mark
-                foreach (var contour in toClose)
+                /* For all contours to close, update their parent based on maximum depth */
+                /* Close them */
+                foreach (var contour in canBeClosed)
                 {
+                    /* Update open/closed */
                     open.Remove(contour);
                     closed.Add(contour);
+                    
+                    /* Find the maximum depth potential parent */
+                    var maxDepthParent = containment[contour][0];
+                    foreach (var parent in containment[contour])
+                    {
+                        if (parent.GetDepth() > maxDepthParent.GetDepth())
+                        {
+                            maxDepthParent = parent;
+                        }
+                    }
+                    contour.Parent = maxDepthParent;
+                    maxDepthParent.Holes.Add(contour);
+                }
+
+                /* Safety case to avoid infinite loops */
+                if (canBeClosed.Count == 0)
+                {
+                    Debug.LogError("Composition of contours halted; infinite loop detected.");
+                    break;
                 }
             }
-            
         }
 
         /// <summary>

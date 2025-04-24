@@ -20,7 +20,7 @@ namespace ethanr_utils.dual_contouring
         [SerializeField] private float rotation = 4.6f;
         [SerializeField] private float scale = 1.0f;
 
-        private int size = 9;
+        private int size = 20;
         private Rect area = new Rect(0.0f, 0.0f, 4.0f, 4.0f);
         private SdfObject obj;
         
@@ -31,9 +31,12 @@ namespace ethanr_utils.dual_contouring
         {
             chunk = new VolumeChunk(new Vector2Int(size, size), area);
             var largerCircle = new CircleSdf(1.5f);
-            var smallerCircle = new CircleSdf(.75f);
+            var smallerCircle = new CircleSdf(1f);
+            var evenSmallerCircle = new CircleSdf(0.6f);
+            var theSmallestCircle = new CircleSdf(0.3f);
             var torus = new DifferenceSdf(largerCircle, smallerCircle);
-            obj = new SdfObject(torus);
+            var innerTorus = new DifferenceSdf(evenSmallerCircle, theSmallestCircle);
+            obj = new SdfObject(new UnionSdf(torus, innerTorus));
             
             // var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
             // var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
