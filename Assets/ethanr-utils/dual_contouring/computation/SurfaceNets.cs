@@ -23,6 +23,7 @@ namespace ethanr_utils.dual_contouring.computation
         /// Generate the surface.
         /// </summary>
         /// <param name="chunk"></param>
+        /// <param name="sdf"></param>
         /// <returns></returns>
         public static (List<Mesh> meshes, List<Contour> contours) Generate(VolumeChunk chunk, SdfOperator sdf)
         {
@@ -337,9 +338,9 @@ namespace ethanr_utils.dual_contouring.computation
         }
 
         /// <summary>
-        /// Triangulate all of the provided meshes from their polygons.
+        /// Triangulate all the provided meshes from their polygons.
         /// </summary>
-        /// <param name="outerContours"></param>
+        /// <param name="contours"></param>
         /// <returns></returns>
         private static List<Mesh> GenerateMeshes(List<Contour> contours)
         {
@@ -408,7 +409,6 @@ namespace ethanr_utils.dual_contouring.computation
             /* Now, iteratively resolve the hierarchy of surfaces */
             HashSet<Contour> open = new HashSet<Contour>();
             HashSet<Contour> closed = new HashSet<Contour>();
-            List<Contour> outer = new List<Contour>();
             
             /* Start by putting contours into open/closed categories, with outer contours closed immediately */
             foreach (var contour in containment.Keys)
@@ -416,7 +416,6 @@ namespace ethanr_utils.dual_contouring.computation
                 if (containment[contour].Count == 0)
                 {
                     closed.Add(contour);
-                    outer.Add(contour);
                     contour.Parent = null;
                 }
                 else
@@ -469,7 +468,7 @@ namespace ethanr_utils.dual_contouring.computation
         }
 
         /// <summary>
-        /// Helper to convert our points into vertices for trianglenet
+        /// Helper to convert our points into vertices for triangle-NET
         /// </summary>
         /// <param name="contour"></param>
         /// <returns></returns>
@@ -704,8 +703,8 @@ namespace ethanr_utils.dual_contouring.computation
             }
             
             /* Connect up the two verts */
-            leftChoice.Adjacent.Add(rightChoice);
-            rightChoice.Adjacent.Add(leftChoice);
+            leftChoice!.Adjacent.Add(rightChoice);
+            rightChoice!.Adjacent.Add(leftChoice);
         }
         
         /// <summary>
@@ -759,8 +758,8 @@ namespace ethanr_utils.dual_contouring.computation
             }
             
             /* Connect up the two verts */
-            botChoice.Adjacent.Add(topChoice);
-            topChoice.Adjacent.Add(botChoice);
+            botChoice!.Adjacent.Add(topChoice);
+            topChoice!.Adjacent.Add(botChoice);
         }
     }
 }
