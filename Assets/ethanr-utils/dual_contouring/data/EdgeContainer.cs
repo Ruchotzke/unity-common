@@ -104,7 +104,7 @@ namespace ethanr_utils.dual_contouring.data
         /// <param name="chunk"></param>
         /// <param name="intersection"></param>
         /// <returns></returns>
-        public bool TryGetEdgeIntersectionPoint(Vector2Int source, EdgeDirection direction, VolumeChunk chunk, out Vector2 intersection)
+        public bool TryGetEdgeIntersectionPoint(Vector2Int source, EdgeDirection direction, VolumeChunk chunk, out Vector2 intersection, out Vector2 normal)
         {
             /* First normalize the direction to up or right */
             if (direction == EdgeDirection.Left)
@@ -124,22 +124,24 @@ namespace ethanr_utils.dual_contouring.data
                 if (direction == EdgeDirection.Right)
                 {
                     intersection = Vector2.Lerp(chunk.VoxelToWorld(source.x, source.y), chunk.VoxelToWorld(source.x+1, source.y), edge.z);
+                    normal = new Vector2(edge.x, edge.y);
                     return true;
                 }
                 if (direction == EdgeDirection.Up)
                 {
                     intersection = Vector2.Lerp(chunk.VoxelToWorld(source.x, source.y), chunk.VoxelToWorld(source.x, source.y+1), edge.z);
+                    normal = new Vector2(edge.x, edge.y);
                     return true;
                 }
 
                 intersection = Vector2.zero;
+                normal = Vector2.zero;
                 return false;
             }
-            else
-            {
-                intersection = Vector2.zero;
-                return false;
-            }
+
+            intersection = Vector2.zero;
+            normal = Vector2.zero;
+            return false;
         }
     }
 }

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using ethanr_utils.dual_contouring.computation;
 using ethanr_utils.dual_contouring.data;
 using ethanr_utils.dual_contouring.sdf;
+using MathNet.Numerics.LinearAlgebra;
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityUtilities.General;
@@ -16,12 +17,15 @@ namespace ethanr_utils.dual_contouring
     public class DualContourTester : MonoBehaviour
     {
         private VolumeChunk chunk;
-        [FormerlySerializedAs("rotate")] [SerializeField] private bool update;
+        [SerializeField] private bool update;
         [SerializeField] private Vector2 position;
         [SerializeField] private float rotation = 4.6f;
         [SerializeField] private float scale = 1.0f;
+        [SerializeField] private bool clip = false;
+        [SerializeField] private bool bias = false;
+        [SerializeField, Range(0, 3.0f)] private float biasAmount = 0.0f;
 
-        private int size = 12;
+        private int size = 32;
         private Rect area = new Rect(0.0f, 0.0f, 4.0f, 4.0f);
         private SdfObject obj;
         
@@ -32,10 +36,10 @@ namespace ethanr_utils.dual_contouring
         {
             chunk = new VolumeChunk(new Vector2Int(size, size), area);
             
-            var largerCircle = new CircleSdf(1.5f);
-            var smallerCircle = new CircleSdf(1f);
-            var torus = new DifferenceSdf(largerCircle, smallerCircle);
-            obj = new SdfObject(torus);
+            // var largerCircle = new CircleSdf(1.5f);
+            // var smallerCircle = new CircleSdf(1f);
+            // var torus = new DifferenceSdf(largerCircle, smallerCircle);
+            // obj = new SdfObject(torus);
             
             // var largerCircle = new CircleSdf(1.5f);
             // var smallerCircle = new CircleSdf(1f);
@@ -45,10 +49,10 @@ namespace ethanr_utils.dual_contouring
             // var innerTorus = new DifferenceSdf(evenSmallerCircle, theSmallestCircle);
             // obj = new SdfObject(new UnionSdf(torus, innerTorus));
             
-            // var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
-            // var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
-            // var union = new UnionSdf(r1, r2);
-            // obj = new SdfObject(union);
+            var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
+            var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
+            var union = new UnionSdf(r1, r2);
+            obj = new SdfObject(union);
 
             // var rect = new RectSdf(new Vector2(3.0f, 2.0f));
             // var rectObj = new SdfObject(rect);
@@ -93,7 +97,7 @@ namespace ethanr_utils.dual_contouring
             }
             
             /* Render the meshes */
-            var output = SurfaceNets.Generate(chunk, obj);
+            var output = SurfaceNets.Generate(chunk, obj, new QEFSettings(bias, clip, biasAmount));
             foreach (var mesh in output.meshes)
             {
                 /* Gather a pooled mesh */
@@ -101,7 +105,6 @@ namespace ethanr_utils.dual_contouring
                 mf.mesh = mesh;
                 currFilters.Add(mf);
             }
-            // polygons = output.polygons;
         }
 
         private List<List<SurfacePoint>> edges;

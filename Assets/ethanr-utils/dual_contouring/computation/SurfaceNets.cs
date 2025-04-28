@@ -24,8 +24,9 @@ namespace ethanr_utils.dual_contouring.computation
         /// </summary>
         /// <param name="chunk"></param>
         /// <param name="sdf"></param>
+        /// <param name="settings"></param>
         /// <returns></returns>
-        public static (List<Mesh> meshes, List<Contour> contours) Generate(VolumeChunk chunk, SdfOperator sdf)
+        public static (List<Mesh> meshes, List<Contour> contours) Generate(VolumeChunk chunk, SdfOperator sdf, QEFSettings settings)
         {
             /* SYNC POINT: Sampling data provided */
             /* GOAL: Compute all intersections and normals */
@@ -38,12 +39,16 @@ namespace ethanr_utils.dual_contouring.computation
                     if (CheckIntersection(chunk.Points[x, y], chunk.Points[x + 1, y], out float t))
                     {
                         /* BL->BR */
-                        chunk.Edges.SetEdge(new Vector2Int(x,y), EdgeContainer.EdgeDirection.Right, new Vector3(0.0f, 0.0f, t));
+                        var isctPoint = Vector2.Lerp(chunk.VoxelToWorld(x, y), chunk.VoxelToWorld(x+1, y), t);
+                        var normal = sdf.SampleNormal(isctPoint);
+                        chunk.Edges.SetEdge(new Vector2Int(x,y), EdgeContainer.EdgeDirection.Right, new Vector3(normal.x, normal.y, t));
                     }
                     if (CheckIntersection(chunk.Points[x, y+1], chunk.Points[x, y], out t))
                     {
                         /* TL->BL */
-                        chunk.Edges.SetEdge(new Vector2Int(x, y+1), EdgeContainer.EdgeDirection.Down,  new Vector3(0.0f, 0.0f, t));
+                        var isctPoint = Vector2.Lerp(chunk.VoxelToWorld(x, y+1), chunk.VoxelToWorld(x, y), t);
+                        var normal = sdf.SampleNormal(isctPoint);
+                        chunk.Edges.SetEdge(new Vector2Int(x, y+1), EdgeContainer.EdgeDirection.Down,  new Vector3(normal.x, normal.y, t));
                     }
                 }
             }
@@ -56,7 +61,9 @@ namespace ethanr_utils.dual_contouring.computation
                 if (CheckIntersection(chunk.Points[x, height-1], chunk.Points[x + 1, height-1], out float t))
                 {
                     /* L->R */
-                    chunk.Edges.SetEdge(new Vector2Int(x,height-1), EdgeContainer.EdgeDirection.Right, new Vector3(0.0f, 0.0f, t));
+                    var isctPoint = Vector2.Lerp(chunk.VoxelToWorld(x, height-1), chunk.VoxelToWorld(x + 1, height-1), t);
+                    var normal = sdf.SampleNormal(isctPoint);
+                    chunk.Edges.SetEdge(new Vector2Int(x,height-1), EdgeContainer.EdgeDirection.Right, new Vector3(normal.x, normal.y, t));
                 }
             }
             for (int y = 0; y < height - 1; y++)
@@ -64,7 +71,9 @@ namespace ethanr_utils.dual_contouring.computation
                 if (CheckIntersection(chunk.Points[width - 1, y], chunk.Points[width - 1, y + 1], out float t))
                 {
                     /* B->T */
-                    chunk.Edges.SetEdge(new Vector2Int(width-1, y), EdgeContainer.EdgeDirection.Up, new Vector3(0.0f, 0.0f, t));
+                    var isctPoint = Vector2.Lerp(chunk.VoxelToWorld(width - 1, y), chunk.VoxelToWorld(width - 1, y + 1), t);
+                    var normal = sdf.SampleNormal(isctPoint);
+                    chunk.Edges.SetEdge(new Vector2Int(width-1, y), EdgeContainer.EdgeDirection.Up, new Vector3(normal.x, normal.y, t));
                 }
             }
             
@@ -84,34 +93,39 @@ namespace ethanr_utils.dual_contouring.computation
                     
                     /* Grab all intersection points */
                     var isctPoints = new List<Vector2>();
+                    var normalPoints = new List<Vector2>();
                     if (chunk.Edges.TryGetEdgeIntersectionPoint(voxel, EdgeContainer.EdgeDirection.Right, chunk,
-                            out var isct))
+                            out var isct, out var norm))
                     {
                         /* BOTTOM */
                         isctPoints.Add(isct);
+                        normalPoints.Add(norm);
                         surfaceEdges.Add((voxel, voxel + Vector2Int.right, EdgeContainer.EdgeDirection.Right));
                     }
 
-                    if (chunk.Edges.TryGetEdgeIntersectionPoint(voxel, EdgeContainer.EdgeDirection.Up, chunk, out isct))
+                    if (chunk.Edges.TryGetEdgeIntersectionPoint(voxel, EdgeContainer.EdgeDirection.Up, chunk, out isct, out norm))
                     {
                         /* LEFT */
                         isctPoints.Add(isct);
+                        normalPoints.Add(norm);
                         surfaceEdges.Add((voxel, voxel + Vector2Int.up, EdgeContainer.EdgeDirection.Up));
                     }
 
                     if (chunk.Edges.TryGetEdgeIntersectionPoint(voxel + Vector2Int.one,
-                            EdgeContainer.EdgeDirection.Down, chunk, out isct))
+                            EdgeContainer.EdgeDirection.Down, chunk, out isct, out norm))
                     {
                         /* RIGHT */
                         isctPoints.Add(isct);
+                        normalPoints.Add(norm);
                         surfaceEdges.Add((voxel + Vector2Int.right, voxel + Vector2Int.one, EdgeContainer.EdgeDirection.Up));
                     }
 
                     if (chunk.Edges.TryGetEdgeIntersectionPoint(voxel + Vector2Int.one,
-                            EdgeContainer.EdgeDirection.Left, chunk, out isct))
+                            EdgeContainer.EdgeDirection.Left, chunk, out isct, out norm))
                     {
                         /* TOP */
                         isctPoints.Add(isct);
+                        normalPoints.Add(norm);
                         surfaceEdges.Add((voxel + Vector2Int.up, voxel + Vector2Int.one, EdgeContainer.EdgeDirection.Right));
                     }
                     
@@ -123,9 +137,16 @@ namespace ethanr_utils.dual_contouring.computation
                             continue;
                         case 2:
                             /* Normal case - average */
+                            var qef = new QEF(
+                                isctPoints.ToArray(),
+                                normalPoints.ToArray(),
+                                chunk.VoxelToWorld(x,y),
+                                chunk.VoxelToWorld(x + 1, y+1),
+                                settings
+                            );
                             currList.Add((null, new SurfacePoint
                             {
-                                Position = (isctPoints[0] + isctPoints[1]) * 0.5f,
+                                Position = qef.Solve(),
                                 SurfaceID = 0,
                                 Adjacent = new List<SurfacePoint>()
                             }));
@@ -135,15 +156,29 @@ namespace ethanr_utils.dual_contouring.computation
                             //TODO: Find a less arbitrary way to handle saddles.
                             // Debug.LogWarning($"Saddle Point...");
                             /* Generate two surface points for this voxel */
+                            var qef1 = new QEF(
+                                new []{isctPoints[0], isctPoints[1]},
+                                new []{normalPoints[0], normalPoints[1]},
+                                chunk.VoxelToWorld(x,y),
+                                chunk.VoxelToWorld(x + 1, y+1),
+                                settings
+                            );
+                            var qef2 = new QEF(
+                                new []{isctPoints[2], isctPoints[3]},
+                                new []{normalPoints[2], normalPoints[3]},
+                                chunk.VoxelToWorld(x,y),
+                                chunk.VoxelToWorld(x + 1, y+1),
+                                settings
+                            );
                             currList.Add((true, new SurfacePoint
                             {
-                                Position = (isctPoints[0] + isctPoints[1]) * 0.5f,
+                                Position = qef1.Solve(),
                                 SurfaceID = 0,
                                 Adjacent = new List<SurfacePoint>()
                             } ));
                             currList.Add((false, new SurfacePoint
                             {
-                                Position = (isctPoints[2] + isctPoints[3]) * 0.5f,
+                                Position = qef2.Solve(),
                                 SurfaceID = 0,
                                 Adjacent = new List<SurfacePoint>()
                             } ));
@@ -174,7 +209,7 @@ namespace ethanr_utils.dual_contouring.computation
                             var innerPoint = from entry in surfacePoints[voxelEdge.a]
                                 where entry.isLowerLeft == null || entry.isLowerLeft.Value
                                     select entry;
-                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out var isct))
+                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out var isct, out var norm))
                             {
                                 Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
                             }
@@ -198,7 +233,7 @@ namespace ethanr_utils.dual_contouring.computation
                             var innerPoint = from entry in surfacePoints[voxelEdge.a + Vector2Int.left]
                                 where entry.isLowerLeft == null || !entry.isLowerLeft.Value
                                     select entry;
-                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out var isct))
+                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out var isct, out var norm))
                             {
                                 Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
                             }
@@ -225,7 +260,7 @@ namespace ethanr_utils.dual_contouring.computation
                             var innerPoint = from entry in surfacePoints[voxelEdge.a]
                                 where entry.isLowerLeft == null || entry.isLowerLeft.Value
                                     select entry;
-                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out var isct))
+                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out var isct, out var norm))
                             {
                                 Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
                             }
@@ -249,7 +284,7 @@ namespace ethanr_utils.dual_contouring.computation
                             var innerPoint = from entry in surfacePoints[voxelEdge.a + Vector2Int.down]
                                 where entry.isLowerLeft == null || !entry.isLowerLeft.Value
                                     select entry;
-                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out var isct))
+                            if (!chunk.Edges.TryGetEdgeIntersectionPoint(voxelEdge.a, voxelEdge.dir, chunk, out var isct, out var norm))
                             {
                                 Debug.LogError($"Unable to find intersection for voxel {voxelEdge.a}");
                             }
