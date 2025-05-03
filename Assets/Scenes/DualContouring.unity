@@ -148,6 +148,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d4056c3032534d8a8ac5f3cf14104045, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  RenderSamplePoints: 1
+  RenderSurfacePoints: 0
+  size: 16
   update: 1
   position: {x: 3.16, y: 3.07}
   rotation: 0

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using ethanr_utils.dual_contouring.csg_ops;
 using UnityEngine;
 
@@ -68,10 +70,34 @@ namespace ethanr_utils.dual_contouring.data.job_structs
         }
 
         /// <summary>
+        /// Use surface nets to voxelize this container.
+        /// </summary>
+        /// <param name="sdf"></param>
+        /// <param name="qef"></param>
+        /// <returns></returns>
+        public (List<Mesh> meshes, List<Contour> contours) SurfaceNets(SdfOperator sdf, QEFSettings qef)
+        {
+            /* First initialize the data */
+            SamplePoints(sdf);
+            SampleEdges(sdf);
+            
+            /* Now compute the interior points of all voxel cells */
+            GenerateSurfacePoints();
+            
+            /* Connect up neighboring surface points */
+            
+            /* Generate contours based on surface points */
+            
+            /* Make meshes from contours */
+
+            return (new List<Mesh>(), null);
+        }
+
+        /// <summary>
         /// Sample all points of this voxel space.
         /// </summary>
         /// <param name="sdf"></param>
-        public void SamplePoints(SdfOperator sdf)
+        private void SamplePoints(SdfOperator sdf)
         {
             for (int x = 0; x < VoxelPoints.GetLength(0); x++)
             {
@@ -93,7 +119,7 @@ namespace ethanr_utils.dual_contouring.data.job_structs
         /// Sample all edges of this voxel space.
         /// </summary>
         /// <param name="sdf"></param>
-        public void SampleEdges(SdfOperator sdf)
+        private void SampleEdges(SdfOperator sdf)
         {
             /* First handle all baseline edges (have two edges per point) */
             for (int x = 0; x < Size.x; x++)
@@ -117,6 +143,66 @@ namespace ethanr_utils.dual_contouring.data.job_structs
             for (int y = 0; y < Size.y; y++)
             {
                 UpVoxelEdges[Size.x, y] = new VoxelEdge(this, sdf, new Vector2Int(Size.x, y), VoxelDirection.Up); 
+            }
+        }
+
+        /// <summary>
+        /// Compute the surface points for all voxel cells.
+        /// </summary>
+        private void GenerateSurfacePoints()
+        {
+            for (int x = 0; x < Size.x; x++)
+            {
+                for (int y = 0; y < Size.y; y++)
+                {
+                    /* Determine the number of intersection points */
+                    List<Vector3> intersectionPoints = new List<Vector3>();
+                    var bot = VoxelCells[x, y].GetEdge(this, VoxelEdgeDirection.Bottom);
+                    var top = VoxelCells[x, y].GetEdge(this, VoxelEdgeDirection.Top);
+                    var left = VoxelCells[x, y].GetEdge(this, VoxelEdgeDirection.Left);
+                    var right = VoxelCells[x, y].GetEdge(this, VoxelEdgeDirection.Right);
+                    
+                    if (bot.EdgeIntersection != null) intersectionPoints.Add(bot.EdgeIntersection.Value);
+                    if (right.EdgeIntersection != null) intersectionPoints.Add(right.EdgeIntersection.Value);
+                    if (top.EdgeIntersection != null) intersectionPoints.Add(top.EdgeIntersection.Value);
+                    if (left.EdgeIntersection != null) intersectionPoints.Add(left.EdgeIntersection.Value);
+                    
+                    /* We also need to remove duplicates, as sometimes a corner has an intersection */
+                    //TODO: Handle this more appropriately, as in singleton overlap points between edges.
+                    var q = intersectionPoints.GroupBy(x => x).
+                        Where(g => g.Count() > 1).Select(x => x.Key);
+                    foreach (var dup in q)
+                    {
+                        intersectionPoints.Remove(dup);
+                    }
+                    
+                    /* Compute surface points based on number of intersections (2 or 4) */
+                    switch (intersectionPoints.Count)
+                    {
+                        case 0:
+                            /* Nothing to do, fully internal/external */
+                            continue;
+                        case 2:
+                            /* Single point in this cell, normal case */
+                            var avg = intersectionPoints[0] + intersectionPoints[1];
+                            avg /= 2.0f;
+                            VoxelCells[x, y].SurfacePoints[0] = avg;
+                            break;
+                        case 4:
+                            /* Saddle point, arbitrarily resolve */
+                            /* Connect B/L and T/R */
+                            var bl = (intersectionPoints[(int)VoxelEdgeDirection.Bottom] + intersectionPoints[(int)VoxelEdgeDirection.Left]) / 2.0f;
+                            var tr = (intersectionPoints[(int)VoxelEdgeDirection.Top] + intersectionPoints[(int)VoxelEdgeDirection.Right]) / 2.0f;
+                            
+                            VoxelCells[x, y].SurfacePoints[0] = bl;
+                            VoxelCells[x, y].SurfacePoints[1] = tr;
+                            break;
+                        default:
+                            /* Something WEIRD is happening */
+                            Debug.LogError($"Unable to process voxel with {intersectionPoints.Count} intersections...");
+                            continue;
+                    }
+                }
             }
         }
     }

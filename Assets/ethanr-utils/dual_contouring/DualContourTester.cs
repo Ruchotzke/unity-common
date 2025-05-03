@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using ethanr_utils.dual_contouring.computation;
 using ethanr_utils.dual_contouring.data;
+using ethanr_utils.dual_contouring.data.job_structs;
 using ethanr_utils.dual_contouring.sdf;
 using MathNet.Numerics.LinearAlgebra;
 using UnityEngine;
@@ -16,25 +17,33 @@ namespace ethanr_utils.dual_contouring
     /// </summary>
     public class DualContourTester : MonoBehaviour
     {
-        private VolumeChunk chunk;
+        [Header("Rendering")] 
+        [SerializeField] private bool RenderSamplePoints = false;
+        [SerializeField] private bool RenderSurfacePoints = false;
+
+        [Header("Dual Contouring Object")]
+        [SerializeField] private int size = 16;
         [SerializeField] private bool update;
         [SerializeField] private Vector2 position;
         [SerializeField] private float rotation = 4.6f;
         [SerializeField] private float scale = 1.0f;
+        
+        [Header("QEF Settings")]
         [SerializeField] private bool clip = false;
         [SerializeField] private bool bias = false;
         [SerializeField, Range(0, 3.0f)] private float biasAmount = 0.0f;
 
-        private int size = 32;
         private Rect area = new Rect(0.0f, 0.0f, 4.0f, 4.0f);
         private SdfObject obj;
         
         private List<MeshFilter> currFilters = new List<MeshFilter>();
         private List<List<SurfacePoint>> polygons = new List<List<SurfacePoint>>();
+
+        private VoxelDataContainer voxelData;
         
         private void Awake()
         {
-            chunk = new VolumeChunk(new Vector2Int(size, size), area);
+            // chunk = new VolumeChunk(new Vector2Int(size, size), area);
             
             // var largerCircle = new CircleSdf(1.5f);
             // var smallerCircle = new CircleSdf(1f);
@@ -81,13 +90,15 @@ namespace ethanr_utils.dual_contouring
             if (update)
             {
                 // rotation += 15 * Time.deltaTime;
-                chunk = new VolumeChunk(new Vector2Int(size, size), area);
+                // chunk = new VolumeChunk(new Vector2Int(size, size), area);
                 obj.Position = position;
                 obj.Rotation = rotation;
                 obj.Scale = scale;
-                chunk.Sample(obj);
+                // chunk.Sample(obj);
                 // evaluator.EvaluateAgainst(chunk, trans);
             }
+            
+            voxelData = new VoxelDataContainer(Vector2Int.one * size, area);
             
             /* Remove the old meshes */
             while (currFilters.Count > 0)
@@ -97,7 +108,8 @@ namespace ethanr_utils.dual_contouring
             }
             
             /* Render the meshes */
-            var output = SurfaceNets.Generate(chunk, obj, new QEFSettings(bias, clip, biasAmount));
+            // var output = SurfaceNets.Generate(chunk, obj, new QEFSettings(bias, clip, biasAmount));
+            var output = voxelData.SurfaceNets(obj, new QEFSettings(bias, clip, biasAmount));
             foreach (var mesh in output.meshes)
             {
                 /* Gather a pooled mesh */
@@ -113,66 +125,38 @@ namespace ethanr_utils.dual_contouring
         {
             if (Application.isPlaying)
             {
-                /* Render the underlying data */
-                if (chunk != null)
+                if (voxelData != null)
                 {
-                    for (int x = 0; x < chunk.Points.GetLength(0); x++)
+                    /* Points */
+                    if (RenderSamplePoints)
                     {
-                        for (int y = 0; y < chunk.Points.GetLength(1); y++)
+                        foreach (var point in voxelData.VoxelPoints)
                         {
-                            /* Underlying sample */
-                            Gizmos.color = chunk.Points[x,y].SampleValue <= 0.0f ? Color.red : Color.black;
-                            Gizmos.DrawSphere(chunk.VoxelToWorld(new Vector2Int(x, y)), 0.05f);
+                            Gizmos.color = point.Value <= 0.0f ? Color.red : Color.green;
+                            Gizmos.DrawSphere(point.Position, 0.02f);
+                        }
+                    }
+                    
+                    /* Surface Points */
+                    if (RenderSurfacePoints)
+                    {
+                        Gizmos.color = Color.cyan;
+                        foreach (var cell in voxelData.VoxelCells)
+                        {
+                            foreach (var potSurfacePoint in cell.SurfacePoints)
+                            {
+                                if (potSurfacePoint != null)
+                                {
+                                    Gizmos.DrawSphere(potSurfacePoint.Value, 0.02f);
+                                }
+                                else
+                                {
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
-                
-                /* Render the polygons */
-                foreach (var polygon in polygons)
-                {
-                    for (int i = 0; i < polygon.Count-1; i++)
-                    {
-                        Gizmos.color = Color.green;
-                        Gizmos.DrawLine(polygon[i].Position, polygon[i + 1].Position);
-                        var lerpPoint = Vector2.Lerp(polygon[i].Position, polygon[i + 1].Position, 0.8f);
-                        Gizmos.color = Color.magenta;
-                        Gizmos.DrawCube(lerpPoint, Vector3.one * 0.05f);
-                    }
-                    Gizmos.color = Color.green;
-                    Gizmos.DrawLine(polygon[0].Position, polygon[^1].Position);
-                    Gizmos.color = Color.magenta;
-                    var finalLerp = Vector2.Lerp(polygon[^1].Position, polygon[0].Position, 0.8f);
-                    Gizmos.DrawCube(finalLerp, Vector3.one * 0.05f);
-                }
-
-                // /* Voxel */
-                // edges = SurfaceNets.Generate(chunk, obj);
-                //
-                // if (edges != null)
-                // {
-                //     Gizmos.color = Color.green;
-                //     foreach (var polygon in edges)
-                //     {
-                //         for (int i = 0; i < polygon.Count-1; i++)
-                //         {
-                //             Gizmos.DrawLine(polygon[i].Position, polygon[i + 1].Position);
-                //         }
-                //         Gizmos.DrawLine(polygon[0].Position, polygon[^1].Position);
-                //     }
-                //     // string surfaceIDs = "";
-                //     // foreach (var surface in edges)
-                //     // { 
-                //     //     surfaceIDs += surface[0].SurfaceID + ", ";
-                //     //     var surfaceColor = Color.HSVToRGB(Random.Range(0.0f, 1.0f), 1.0f, 1.0f);
-                //     //     foreach (var point in surface)
-                //     //     {
-                //     //         Gizmos.color = surfaceColor;
-                //     //         Gizmos.DrawSphere(point.Position.ToVector3WithZ(-0.05f), 0.05f);
-                //     //     }
-                //     // }
-                //     // Debug.Log(surfaceIDs);
-                // }
-
             }
         }
     }

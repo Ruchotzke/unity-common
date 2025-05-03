@@ -24,17 +24,9 @@ namespace ethanr_utils.dual_contouring.data.job_structs
         public readonly Vector3? EdgeData;
 
         /// <summary>
-        /// Construct a new voxel edge.
+        /// The world position of this edge's intersection point.
         /// </summary>
-        /// <param name="origin"></param>
-        /// <param name="direction"></param>
-        /// <param name="edgeData"></param>
-        public VoxelEdge(Vector2Int origin, VoxelDirection direction, Vector3 edgeData)
-        {
-            Origin = origin;
-            Direction = direction;
-            EdgeData = edgeData;
-        }
+        public readonly Vector2? EdgeIntersection;
 
         /// <summary>
         /// Generate a new voxel edge from the provided data.
@@ -59,11 +51,13 @@ namespace ethanr_utils.dual_contouring.data.job_structs
                 var worldPos = Vector2.Lerp(a.Position, b.Position, t);
                 var normal = sdf.SampleNormal(worldPos);
                 EdgeData = new Vector3(normal.x, normal.y, t);
+                EdgeIntersection = worldPos;
             }
             else
             {
                 /* This edge does not cross the isosurface */
                 EdgeData = null;
+                EdgeIntersection = null;
             }
         }
         
