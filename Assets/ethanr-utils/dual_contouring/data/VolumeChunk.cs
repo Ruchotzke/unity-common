@@ -100,7 +100,11 @@ namespace ethanr_utils.dual_contouring.data
             return voxels;
         }
 
-        public void Update(SdfOperator sdf)
+        /// <summary>
+        /// Sample the provided SDF and save values into this chunk.
+        /// </summary>
+        /// <param name="sdf"></param>
+        public void Sample(SdfOperator sdf)
         {
             for (int x = 0; x < Points.GetLength(0); x++)
             {

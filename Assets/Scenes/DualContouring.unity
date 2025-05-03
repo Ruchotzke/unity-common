@@ -152,6 +152,9 @@ MonoBehaviour:
   position: {x: 3.16, y: 3.07}
   rotation: 0
   scale: 1
+  clip: 0
+  bias: 1
+  biasAmount: 0.01
 --- !u!4 &43067942
 Transform:
   m_ObjectHideFlags: 0

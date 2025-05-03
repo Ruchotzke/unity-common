@@ -49,10 +49,10 @@ namespace ethanr_utils.dual_contouring
             // var innerTorus = new DifferenceSdf(evenSmallerCircle, theSmallestCircle);
             // obj = new SdfObject(new UnionSdf(torus, innerTorus));
             
-            var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
-            var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
-            var union = new UnionSdf(r1, r2);
-            obj = new SdfObject(union);
+            // var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
+            // var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
+            // var union = new UnionSdf(r1, r2);
+            // obj = new SdfObject(union);
 
             // var rect = new RectSdf(new Vector2(3.0f, 2.0f));
             // var rectObj = new SdfObject(rect);
@@ -68,10 +68,10 @@ namespace ethanr_utils.dual_contouring
             // var diff = new DifferenceSdf(r1, r2);
             // obj = new SdfObject(diff);
 
-            // var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
-            // var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
-            // var isct = new IntersectionSdf(r1, r2);
-            // obj = new SdfObject(isct);
+            var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
+            var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
+            var isct = new IntersectionSdf(r1, r2);
+            obj = new SdfObject(isct);
 
             // obj = new SdfObject(new RectSdf(new Vector2(2.0f, 1.0f)));
         }
@@ -85,7 +85,7 @@ namespace ethanr_utils.dual_contouring
                 obj.Position = position;
                 obj.Rotation = rotation;
                 obj.Scale = scale;
-                chunk.Update(obj);
+                chunk.Sample(obj);
                 // evaluator.EvaluateAgainst(chunk, trans);
             }
             
