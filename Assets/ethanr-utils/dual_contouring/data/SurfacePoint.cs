@@ -18,11 +18,25 @@ namespace ethanr_utils.dual_contouring.data
         /// Used to track which surface this point belongs to.
         /// </summary>
         public uint SurfaceID;
-        
+
         /// <summary>
         /// Neighboring vertices for this point
         /// </summary>
-        public List<SurfacePoint> Adjacent = new List<SurfacePoint>();
+        public List<SurfacePoint> Adjacent;
+
+        public SurfacePoint(Vector2 position)
+        {
+            Position = position;
+            SurfaceID = 0;
+            Adjacent = new List<SurfacePoint>();
+        }
+
+        public SurfacePoint()
+        {
+            SurfaceID = 0;
+            Position = Vector2.zero;
+            Adjacent = new List<SurfacePoint>();
+        }
 
         public override string ToString()
         {

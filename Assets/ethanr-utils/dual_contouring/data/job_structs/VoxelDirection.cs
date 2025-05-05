@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace ethanr_utils.dual_contouring.data.job_structs
 {
     /// <summary>
@@ -18,5 +20,23 @@ namespace ethanr_utils.dual_contouring.data.job_structs
         Right = 1,
         Top = 2,
         Left = 3,
+    }
+
+    public static class VoxelEdgeDirectionExtensions
+    {
+        /// <summary>
+        /// Iterate through all possible edge directions
+        /// </summary>
+        /// <returns></returns>
+        public static List<VoxelEdgeDirection> GetAll()
+        {
+            return new List<VoxelEdgeDirection>()
+            {
+                VoxelEdgeDirection.Bottom,
+                VoxelEdgeDirection.Right,
+                VoxelEdgeDirection.Top,
+                VoxelEdgeDirection.Left,
+            };
+        }
     }
 }

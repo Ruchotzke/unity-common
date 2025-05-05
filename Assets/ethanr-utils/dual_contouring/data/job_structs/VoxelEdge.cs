@@ -77,6 +77,14 @@ namespace ethanr_utils.dual_contouring.data.job_structs
                 return false;
             }
             
+            /* Tangential case: Both samples are on the isoline (0) */
+            /* For now (TODO) consider these non-valid */
+            if (a.Value == 0.0f && b.Value == 0.0f)
+            {
+                t = 0.5f;
+                return false;
+            }
+            
             /* We have an intersection point, compute it */
             t = ApproxLinearInterp(a.Value, b.Value);
             return true;

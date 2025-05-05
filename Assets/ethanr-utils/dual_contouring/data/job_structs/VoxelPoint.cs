@@ -27,5 +27,10 @@ namespace ethanr_utils.dual_contouring.data.job_structs
             Position = position;
             Value = value;
         }
+
+        public override string ToString()
+        {
+            return $"VOXEL POINT: {Position}, {Value}";
+        }
     }
 }

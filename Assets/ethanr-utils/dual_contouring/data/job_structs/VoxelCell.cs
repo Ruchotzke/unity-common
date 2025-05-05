@@ -16,7 +16,7 @@ namespace ethanr_utils.dual_contouring.data.job_structs
         /// <summary>
         /// The surface points contained within this cell.
         /// </summary>
-        public Vector2?[] SurfacePoints;
+        public SurfacePoint[] SurfacePoints;
 
         /// <summary>
         /// Construct a new, empty voxel cell.
@@ -25,7 +25,7 @@ namespace ethanr_utils.dual_contouring.data.job_structs
         public VoxelCell(Vector2Int position)
         {
             Position = position;
-            SurfacePoints = new Vector2?[2]; //support at most 2.
+            SurfacePoints = new SurfacePoint[2]; //support at most 2.
         }
 
         /// <summary>
@@ -83,7 +83,7 @@ namespace ethanr_utils.dual_contouring.data.job_structs
         /// <param name="neighbor"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentOutOfRangeException"></exception>
-        public bool GetNeighbor(VoxelDataContainer data, VoxelEdgeDirection edge, out VoxelCell neighbor)
+        public bool TryGetNeighbor(VoxelDataContainer data, VoxelEdgeDirection edge, out VoxelCell neighbor)
         {
             switch (edge)
             {
@@ -134,6 +134,20 @@ namespace ethanr_utils.dual_contouring.data.job_structs
                 default:
                     throw new ArgumentOutOfRangeException(nameof(edge), edge, null);
             }
+        }
+
+        public override string ToString()
+        {
+            var sf = "";
+            foreach (var point in SurfacePoints)
+            {
+                if (point != null)
+                {
+                    sf += point.ToString() + ", ";
+                }
+            }
+
+            return $"VoxelCell{{{Position} | {sf}}}";
         }
     }
 }

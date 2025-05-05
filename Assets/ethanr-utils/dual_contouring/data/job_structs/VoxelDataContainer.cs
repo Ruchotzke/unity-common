@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using ethanr_utils.dual_contouring.csg_ops;
@@ -44,6 +45,13 @@ namespace ethanr_utils.dual_contouring.data.job_structs
         /// All contained upward voxel edges.
         /// </summary>
         public VoxelEdge[,] UpVoxelEdges;
+
+        /// <summary>
+        /// The border points for this object.
+        /// </summary>
+        private BorderContainer borderContainer;
+
+        public List<SurfacePoint> Points;
         
         /// <summary>
         /// A container used to hold a SINGLE COPY of all voxel information.
@@ -58,6 +66,10 @@ namespace ethanr_utils.dual_contouring.data.job_structs
             VoxelPoints = new VoxelPoint[size.x+1, size.y+1];
             RightVoxelEdges = new VoxelEdge[size.x+1, size.y+1];
             UpVoxelEdges = new VoxelEdge[size.x+1, size.y+1];
+            
+            borderContainer = new BorderContainer();
+            
+            Points = new List<SurfacePoint>();
             
             /* Initialize all cells */
             for (int x = 0; x < size.x; x++)
@@ -85,6 +97,28 @@ namespace ethanr_utils.dual_contouring.data.job_structs
             GenerateSurfacePoints();
             
             /* Connect up neighboring surface points */
+            ConnectSurfacePoints(sdf);
+            
+            /* Don't forget the border/new verts */
+            var corners = borderContainer.GetCorners(Area, sdf);
+            var cornerList = new List<SurfacePoint>();
+            if (corners.bl != null) cornerList.Add(corners.bl);
+            if (corners.br != null) cornerList.Add(corners.br);
+            if (corners.tr != null) cornerList.Add(corners.tr);
+            if (corners.tl != null) cornerList.Add(corners.tl);
+            
+            borderContainer.ConnectEdges();
+
+            foreach (var cell in VoxelCells)
+            {
+                foreach (var point in cell.SurfacePoints)
+                {
+                    if(point != null) Points.Add(point);
+                }
+            }
+
+            Points.AddRange(borderContainer.GetAll());
+            Points.AddRange(cornerList);
             
             /* Generate contours based on surface points */
             
@@ -108,6 +142,12 @@ namespace ethanr_utils.dual_contouring.data.job_structs
                     
                     /* Sample the sdf */
                     var sample = sdf.SampleValue(worldPos);
+
+                    if (sample == 0.0f)
+                    {
+                        /* Perturb! Just a bit... */
+                        sample = (x + y % 2 == 0) ? float.Epsilon : -float.Epsilon;
+                    }
                     
                     /* Save */
                     VoxelPoints[x,y] = new VoxelPoint(worldPos, sample);
@@ -182,25 +222,117 @@ namespace ethanr_utils.dual_contouring.data.job_structs
                         case 0:
                             /* Nothing to do, fully internal/external */
                             continue;
+                        case 1:
+                            /* Technically impossible, but is possible if we remove a duplicate vertex */
+                            /* Appears in one corner */
+                            /* In this case, we just know our intersection point */
+                            VoxelCells[x,y].SurfacePoints[0] = new SurfacePoint(intersectionPoints[0]);
+                            break;
                         case 2:
                             /* Single point in this cell, normal case */
                             var avg = intersectionPoints[0] + intersectionPoints[1];
                             avg /= 2.0f;
-                            VoxelCells[x, y].SurfacePoints[0] = avg;
+                            VoxelCells[x, y].SurfacePoints[0] = new SurfacePoint(avg);
                             break;
                         case 4:
                             /* Saddle point, arbitrarily resolve */
                             /* Connect B/L and T/R */
                             var bl = (intersectionPoints[(int)VoxelEdgeDirection.Bottom] + intersectionPoints[(int)VoxelEdgeDirection.Left]) / 2.0f;
                             var tr = (intersectionPoints[(int)VoxelEdgeDirection.Top] + intersectionPoints[(int)VoxelEdgeDirection.Right]) / 2.0f;
-                            
-                            VoxelCells[x, y].SurfacePoints[0] = bl;
-                            VoxelCells[x, y].SurfacePoints[1] = tr;
+
+                            VoxelCells[x, y].SurfacePoints[0] = new SurfacePoint(bl);
+                            VoxelCells[x, y].SurfacePoints[1] = new SurfacePoint(tr);
                             break;
                         default:
                             /* Something WEIRD is happening */
                             Debug.LogError($"Unable to process voxel with {intersectionPoints.Count} intersections...");
                             continue;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Iterate cell by cell to connect up neighboring surface points.
+        /// </summary>
+        private void ConnectSurfacePoints(SdfOperator sdf)
+        {
+            for (int x = 0; x < Size.x; x++)
+            {
+                for (int y = 0; y < Size.y; y++)
+                {
+                    /* Only process this cell if it has a surface point */
+                    if (VoxelCells[x, y].SurfacePoints[0] == null) continue;
+                    
+                    /* Connect this point to any neighbors via intersection edges */
+                    foreach (var edgedir in VoxelEdgeDirectionExtensions.GetAll())
+                    {
+                        /* Determine if this edge is even relevant */
+                        if (!VoxelCells[x, y].GetEdge(this, edgedir).EdgeData.HasValue) continue;
+                        
+                        /* Get the neighboring cell, or treat this as a border edge */
+                        if (VoxelCells[x, y].TryGetNeighbor(this, edgedir, out var neighbor))
+                        {
+                            /* Connect the surface points */
+                            /* Four possible cases because of saddle points */
+                            if (VoxelCells[x, y].SurfacePoints[1] == null)
+                            {
+                                /* This cell has one surface point */
+                                if (neighbor.SurfacePoints[1] == null)
+                                {
+                                    /* Neighbor has one surface point */
+                                    VoxelCells[x,y].SurfacePoints[0].Adjacent.Add(neighbor.SurfacePoints[0]);
+                                }
+                                else
+                                {
+                                    /* Neighbor has two surface points (Saddle) */
+                                    VoxelCells[x,y].SurfacePoints[0].Adjacent.Add(neighbor.SurfacePoints[
+                                        edgedir is VoxelEdgeDirection.Left or VoxelEdgeDirection.Bottom ? 1 : 0]);
+                                }
+                            }
+                            else
+                            {
+                                /* This cell has two surface points (Saddle) */
+                                if (neighbor.SurfacePoints[1] == null)
+                                {
+                                    /* Neighbor has one surface point */
+                                    VoxelCells[x,y].SurfacePoints[edgedir is VoxelEdgeDirection.Left or VoxelEdgeDirection.Bottom ? 0 : 1]
+                                        .Adjacent.Add(neighbor.SurfacePoints[0]);
+                                }
+                                else
+                                {
+                                    /* Neighbor has two surface points (Saddle) */
+                                    VoxelCells[x,y].SurfacePoints[edgedir is VoxelEdgeDirection.Left or VoxelEdgeDirection.Bottom ? 0 : 1]
+                                        .Adjacent.Add(neighbor.SurfacePoints[edgedir is VoxelEdgeDirection.Left or VoxelEdgeDirection.Bottom ? 1 : 0]);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            /* This is a border with an edge point. Take note. */
+                            var borderPoint = new SurfacePoint()
+                            {
+                                Position = VoxelCells[x, y].GetEdge(this, edgedir).EdgeIntersection.Value,
+                                SurfaceID = 0,
+                                Adjacent = new List<SurfacePoint>()
+                            };
+                            borderContainer.AddBorder(borderPoint, sdf.SampleNormal(borderPoint.Position), edgedir);
+                            
+                            /* Don't forget to link to neighbors too */
+                            if (VoxelCells[x, y].SurfacePoints[1] == null)
+                            {
+                                /* Only one point in this cell */
+                                borderPoint.Adjacent.Add(VoxelCells[x, y].SurfacePoints[0]);
+                                VoxelCells[x, y].SurfacePoints[0].Adjacent.Add(borderPoint);
+                            }
+                            else
+                            {
+                                /* Multiple in this cell */
+                                var index = edgedir is VoxelEdgeDirection.Left or VoxelEdgeDirection.Bottom ? 0 : 1;
+                                borderPoint.Adjacent.Add(VoxelCells[x, y].SurfacePoints[index]);
+                                VoxelCells[x, y].SurfacePoints[index].Adjacent.Add(borderPoint);
+                            }
+                        }
                     }
                 }
             }

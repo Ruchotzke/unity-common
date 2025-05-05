@@ -1,6 +1,8 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using ethanr_utils.dual_contouring.csg_ops;
+using ethanr_utils.dual_contouring.data.job_structs;
 using UnityEngine;
 
 namespace ethanr_utils.dual_contouring.data
@@ -33,6 +35,27 @@ namespace ethanr_utils.dual_contouring.data
         public void AddBottomBorder(SurfacePoint bot, Vector2 norm)
         {
             bottomBorders.Add((bot, norm));
+        }
+
+        public void AddBorder(SurfacePoint borderPoint, Vector2 norm, VoxelEdgeDirection edgeDirection)
+        {
+            switch (edgeDirection)
+            {
+                case VoxelEdgeDirection.Bottom:
+                    AddBottomBorder(borderPoint, norm);
+                    break;
+                case VoxelEdgeDirection.Right:
+                    AddRightBorder(borderPoint, norm);
+                    break;
+                case VoxelEdgeDirection.Top:
+                    AddTopBorder(borderPoint, norm);
+                    break;
+                case VoxelEdgeDirection.Left:
+                    AddLeftBorder(borderPoint, norm);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(edgeDirection), edgeDirection, null);
+            }
         }
 
         public List<SurfacePoint> GetAll()

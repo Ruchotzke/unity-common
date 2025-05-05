@@ -141,19 +141,9 @@ namespace ethanr_utils.dual_contouring
                     if (RenderSurfacePoints)
                     {
                         Gizmos.color = Color.cyan;
-                        foreach (var cell in voxelData.VoxelCells)
+                        foreach (var point in voxelData.Points)
                         {
-                            foreach (var potSurfacePoint in cell.SurfacePoints)
-                            {
-                                if (potSurfacePoint != null)
-                                {
-                                    Gizmos.DrawSphere(potSurfacePoint.Value, 0.02f);
-                                }
-                                else
-                                {
-                                    break;
-                                }
-                            }
+                            Gizmos.DrawSphere(point.Position, 0.02f);
                         }
                     }
                 }
