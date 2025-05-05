@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using ethanr_utils.dual_contouring.computation;
 using ethanr_utils.dual_contouring.csg_ops;
 using ethanr_utils.dual_contouring.data;
+using ethanr_utils.dual_contouring.data.job_structs;
 using ethanr_utils.dual_contouring.sdf;
 using UnityEngine;
 
@@ -24,7 +24,7 @@ namespace ethanr_utils.dual_contouring
         /// <summary>
         /// The chunk containing the painting data.
         /// </summary>
-        private VolumeChunk chunk;
+        private VoxelDataContainer voxelData;
 
         /// <summary>
         /// The SDFs making up this painted chunk.
@@ -44,8 +44,6 @@ namespace ethanr_utils.dual_contouring
             else Instance = this;
             
             /* Set up the initial painting */
-            chunk = new VolumeChunk(new Vector2Int(Mathf.CeilToInt(Area.size.x * VoxelsPerUnit), Mathf.CeilToInt(Area.size.y * VoxelsPerUnit)),
-                Area);
             operations = new SdfObject(new RectSdf(Area.size * 1.5f))
             {
                 Position = Area.center
@@ -63,10 +61,13 @@ namespace ethanr_utils.dual_contouring
             }
 
             /* Apply the operations to the chunk */
-            chunk.Sample(operations);
+            voxelData = new VoxelDataContainer(
+                new Vector2Int(Mathf.CeilToInt(Area.size.x * VoxelsPerUnit),
+                    Mathf.CeilToInt(Area.size.y * VoxelsPerUnit)),
+                Area);
             
             /* Render new meshes */
-            var output = SurfaceNets.Generate(chunk, operations, new QEFSettings(true, false, 0.1f));
+            var output = voxelData.SurfaceNets(operations, new QEFSettings(false, false, 0.1f));
             foreach (var mesh in output.meshes)
             {
                 /* Gather a pooled mesh */
@@ -82,13 +83,13 @@ namespace ethanr_utils.dual_contouring
         /// <param name="sdf"></param>
         public void AddSdf(SdfOperator sdf)
         {
-            Debug.Log("AddSdf: " + sdf.ToString());
+            // Debug.Log("AddSdf: " + sdf.ToString());
             operations = new UnionSdf(sdf, operations);
         }
         
         public void RemoveSdf(SdfOperator sdf)
         {
-            Debug.Log("RemoveSdf: " + sdf.ToString());
+            // Debug.Log("RemoveSdf: " + sdf.ToString());
             operations = new DifferenceSdf(operations, sdf);
         }
     }

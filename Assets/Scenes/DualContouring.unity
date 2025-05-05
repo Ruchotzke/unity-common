@@ -149,11 +149,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   RenderSamplePoints: 1
-  RenderSurfacePoints: 0
-  size: 4
+  RenderSurfacePoints: 1
+  RenderContours: 1
+  RenderMeshes: 1
+  size: 32
   update: 1
-  position: {x: 3.16, y: 3.07}
-  rotation: 0
+  position: {x: 2.2, y: 2.2}
+  rotation: 15
   scale: 1
   clip: 0
   bias: 1

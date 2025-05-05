@@ -1,14 +1,9 @@
 using System.Collections.Generic;
-using ethanr_utils.dual_contouring.computation;
 using ethanr_utils.dual_contouring.data;
 using ethanr_utils.dual_contouring.data.job_structs;
 using ethanr_utils.dual_contouring.sdf;
-using MathNet.Numerics.LinearAlgebra;
 using UnityEngine;
-using UnityEngine.Serialization;
-using UnityUtilities.General;
 using DifferenceSdf = ethanr_utils.dual_contouring.sdf.DifferenceSdf;
-using Random = UnityEngine.Random;
 
 namespace ethanr_utils.dual_contouring
 {
@@ -20,6 +15,8 @@ namespace ethanr_utils.dual_contouring
         [Header("Rendering")] 
         [SerializeField] private bool RenderSamplePoints = false;
         [SerializeField] private bool RenderSurfacePoints = false;
+        [SerializeField] private bool RenderContours = false;
+        [SerializeField] private bool RenderMeshes = false;
 
         [Header("Dual Contouring Object")]
         [SerializeField] private int size = 16;
@@ -40,6 +37,7 @@ namespace ethanr_utils.dual_contouring
         private List<List<SurfacePoint>> polygons = new List<List<SurfacePoint>>();
 
         private VoxelDataContainer voxelData;
+        private List<Contour> contours;
         
         private void Awake()
         {
@@ -50,13 +48,13 @@ namespace ethanr_utils.dual_contouring
             // var torus = new DifferenceSdf(largerCircle, smallerCircle);
             // obj = new SdfObject(torus);
             
-            // var largerCircle = new CircleSdf(1.5f);
-            // var smallerCircle = new CircleSdf(1f);
-            // var evenSmallerCircle = new CircleSdf(0.6f);
-            // var theSmallestCircle = new CircleSdf(0.3f);
-            // var torus = new DifferenceSdf(largerCircle, smallerCircle);
-            // var innerTorus = new DifferenceSdf(evenSmallerCircle, theSmallestCircle);
-            // obj = new SdfObject(new UnionSdf(torus, innerTorus));
+            var largerCircle = new CircleSdf(1.5f);
+            var smallerCircle = new CircleSdf(1f);
+            var evenSmallerCircle = new CircleSdf(0.6f);
+            var theSmallestCircle = new CircleSdf(0.3f);
+            var torus = new DifferenceSdf(largerCircle, smallerCircle);
+            var innerTorus = new DifferenceSdf(evenSmallerCircle, theSmallestCircle);
+            obj = new SdfObject(new UnionSdf(torus, innerTorus));
             
             // var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
             // var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
@@ -77,10 +75,10 @@ namespace ethanr_utils.dual_contouring
             // var diff = new DifferenceSdf(r1, r2);
             // obj = new SdfObject(diff);
 
-            var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
-            var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
-            var isct = new IntersectionSdf(r1, r2);
-            obj = new SdfObject(isct);
+            // var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
+            // var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
+            // var isct = new IntersectionSdf(r1, r2);
+            // obj = new SdfObject(isct);
 
             // obj = new SdfObject(new RectSdf(new Vector2(2.0f, 1.0f)));
         }
@@ -108,15 +106,20 @@ namespace ethanr_utils.dual_contouring
             }
             
             /* Render the meshes */
-            // var output = SurfaceNets.Generate(chunk, obj, new QEFSettings(bias, clip, biasAmount));
             var output = voxelData.SurfaceNets(obj, new QEFSettings(bias, clip, biasAmount));
-            foreach (var mesh in output.meshes)
+            contours = output.contours;
+
+            if (RenderMeshes)
             {
-                /* Gather a pooled mesh */
-                var mf = MeshPool.Instance.MeshFilterPool.Get();
-                mf.mesh = mesh;
-                currFilters.Add(mf);
+                foreach (var mesh in output.meshes)
+                {
+                    /* Gather a pooled mesh */
+                    var mf = MeshPool.Instance.MeshFilterPool.Get();
+                    mf.mesh = mesh;
+                    currFilters.Add(mf);
+                }
             }
+            
         }
 
         private List<List<SurfacePoint>> edges;
@@ -144,6 +147,20 @@ namespace ethanr_utils.dual_contouring
                         foreach (var point in voxelData.Points)
                         {
                             Gizmos.DrawSphere(point.Position, 0.02f);
+                        }
+                    }
+                    
+                    /* Contours */
+                    if (RenderContours)
+                    {
+                        Gizmos.color = Color.yellow;
+                        foreach (var contour in contours)
+                        {
+                            for (int i = 0; i < contour.Data.Count - 1; i++)
+                            {
+                                Gizmos.DrawLine(contour.Data[i].Position, contour.Data[i + 1].Position);
+                            }
+                            Gizmos.DrawLine(contour.Data[^1].Position, contour.Data[0].Position);
                         }
                     }
                 }
