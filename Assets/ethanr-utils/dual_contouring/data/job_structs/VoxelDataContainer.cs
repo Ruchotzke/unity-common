@@ -1,7 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using ethanr_utils.dual_contouring.csg_ops;
+using ethanr_utils.jobs;
 using TriangleNet.Geometry;
+using Unity.Collections;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityUtilities.Meshing;
@@ -31,7 +34,7 @@ namespace ethanr_utils.dual_contouring.data.job_structs
         /// <summary>
         /// All contained voxel cells.
         /// </summary>
-        public VoxelCell[,] VoxelCells;
+        public NativeArray2D<VoxelCell> VoxelCells;
         
         /// <summary>
         /// All contained voxel points.
@@ -65,9 +68,10 @@ namespace ethanr_utils.dual_contouring.data.job_structs
         {
             Size = size;
             Area = area;
-            edgeSizes = new Vector2(area.width/size.x, area.height/size.y); 
-            
-            VoxelCells = new VoxelCell[size.x, size.y];
+            edgeSizes = new Vector2(area.width/size.x, area.height/size.y);
+
+            VoxelCells = new NativeArray2D<VoxelCell>(size.x, size.y, Allocator.Domain,
+                NativeArrayOptions.UninitializedMemory);
             VoxelPoints = new VoxelPoint[size.x+1, size.y+1];
             RightVoxelEdges = new VoxelEdge[size.x+1, size.y+1];
             UpVoxelEdges = new VoxelEdge[size.x+1, size.y+1];
@@ -81,9 +85,39 @@ namespace ethanr_utils.dual_contouring.data.job_structs
             {
                 for (int y = 0; y < size.y; y++)
                 {
-                    VoxelCells[x, y] = new VoxelCell(new Vector2Int(x, y));
+                    VoxelCells[x,y] = new VoxelCell(new Vector2Int(x, y));
                 }
             }
+        }
+
+        /// <summary>
+        /// Convert a 2D position into a 1D index.
+        /// </summary>
+        /// <param name="pos"></param>
+        /// <returns></returns>
+        public int PositionToIndex(Vector2Int pos)
+        {
+            if (pos.x < 0 || pos.x >= Size.x || pos.y < 0 || pos.y >= Size.y)
+            {
+                throw new ArgumentException($"Position {pos} is out of bounds {Size}");
+            }
+
+            return pos.x + Size.x * pos.y;
+        }
+        
+        /// <summary>
+        /// Convert a 2D position into a 1D index.
+        /// </summary>
+        /// <param name="pos"></param>
+        /// <returns></returns>
+        public int PositionToIndex(int x, int y)
+        {
+            if (x < 0 || x >= Size.x || y < 0 || y >= Size.y)
+            {
+                throw new ArgumentException($"Position ({x},{y}) is out of bounds {Size}");
+            }
+
+            return x + Size.x * y;
         }
 
         /// <summary>
