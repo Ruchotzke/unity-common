@@ -1,11 +1,9 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using ethanr_utils.dual_contouring.csg_ops;
 using ethanr_utils.jobs;
 using TriangleNet.Geometry;
 using Unity.Collections;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityUtilities.Meshing;
 
@@ -55,11 +53,11 @@ namespace ethanr_utils.dual_contouring.data.job_structs
         /// The border points for this object.
         /// </summary>
         private BorderContainer borderContainer;
-
+        
         /// <summary>
-        /// All the surface points for this object.
+        /// All surface points for this object.
         /// </summary>
-        public List<SurfacePoint> Points;
+        public SurfacePointContainer SurfacePointContainer;
         
         /// <summary>
         /// A container used to hold a SINGLE COPY of all voxel information.
@@ -77,8 +75,7 @@ namespace ethanr_utils.dual_contouring.data.job_structs
             UpVoxelEdges = new VoxelEdge[size.x+1, size.y+1];
             
             borderContainer = new BorderContainer();
-            
-            Points = new List<SurfacePoint>();
+            SurfacePointContainer = new SurfacePointContainer(size.x * size.y + 4); //+4 for corners
             
             /* Initialize all cells */
             for (int x = 0; x < size.x; x++)
@@ -89,37 +86,7 @@ namespace ethanr_utils.dual_contouring.data.job_structs
                 }
             }
         }
-
-        /// <summary>
-        /// Convert a 2D position into a 1D index.
-        /// </summary>
-        /// <param name="pos"></param>
-        /// <returns></returns>
-        public int PositionToIndex(Vector2Int pos)
-        {
-            if (pos.x < 0 || pos.x >= Size.x || pos.y < 0 || pos.y >= Size.y)
-            {
-                throw new ArgumentException($"Position {pos} is out of bounds {Size}");
-            }
-
-            return pos.x + Size.x * pos.y;
-        }
         
-        /// <summary>
-        /// Convert a 2D position into a 1D index.
-        /// </summary>
-        /// <param name="pos"></param>
-        /// <returns></returns>
-        public int PositionToIndex(int x, int y)
-        {
-            if (x < 0 || x >= Size.x || y < 0 || y >= Size.y)
-            {
-                throw new ArgumentException($"Position ({x},{y}) is out of bounds {Size}");
-            }
-
-            return x + Size.x * y;
-        }
-
         /// <summary>
         /// Use surface nets to voxelize this container.
         /// </summary>
@@ -138,43 +105,44 @@ namespace ethanr_utils.dual_contouring.data.job_structs
             /* Connect up neighboring surface points */
             ConnectSurfacePoints(sdf);
             
-            /* Don't forget the border/new verts */
-            var corners = borderContainer.GetCorners(Area, sdf);
-            var cornerList = new List<SurfacePoint>();
-            if (corners.bl != null) cornerList.Add(corners.bl);
-            if (corners.br != null) cornerList.Add(corners.br);
-            if (corners.tr != null) cornerList.Add(corners.tr);
-            if (corners.tl != null) cornerList.Add(corners.tl);
-            
-            borderContainer.ConnectEdges();
+            // /* Don't forget the border/new verts */
+            // var corners = borderContainer.GetCorners(surfacePointContainer, Area, sdf);
+            // var cornerList = new List<int>();
+            // if (corners.bl != null) cornerList.Add(corners.bl.Value);
+            // if (corners.br != null) cornerList.Add(corners.br.Value);
+            // if (corners.tr != null) cornerList.Add(corners.tr.Value);
+            // if (corners.tl != null) cornerList.Add(corners.tl.Value);
+            //
+            // borderContainer.ConnectEdges(surfacePointContainer, sdf);
+            //
+            // // foreach (var cell in VoxelCells)
+            // // {
+            // //     foreach (var point in cell.SurfacePoints)
+            // //     {
+            // //         if(point != null) Points.Add(point);
+            // //     }
+            // // }
+            // // Points.AddRange(borderContainer.GetAll());
+            // // Points.AddRange(cornerList);
+            //
+            // /* Use a flood fill to assign points to contours based on their neighbors */
+            // surfacePointContainer.FloodFillSurfaces();
+            //
+            // /* Generate contours based on surface points */
+            // var contours = surfacePointContainer.GenerateContours();
+            // foreach (var contour in contours)
+            // {
+            //     contour.AssembleContour(sdf, surfacePointContainer);
+            // }
+            //
+            // /* Categorize contours as holes/surfaces based on their positioning/composition */
+            // ComposeContours(contours);
+            //
+            // /* Make meshes from contours */
+            // var meshes = GenerateMeshes(contours);
 
-            foreach (var cell in VoxelCells)
-            {
-                foreach (var point in cell.SurfacePoints)
-                {
-                    if(point != null) Points.Add(point);
-                }
-            }
-            Points.AddRange(borderContainer.GetAll());
-            Points.AddRange(cornerList);
-            
-            /* Use a flood fill to assign points to contours based on their neighbors */
-            FloodFillSurfaces();
-            
-            /* Generate contours based on surface points */
-            var contours = GenerateContours();
-            foreach (var contour in contours)
-            {
-                contour.AssembleContour(sdf);
-            }
-            
-            /* Categorize contours as holes/surfaces based on their positioning/composition */
-            ComposeContours(contours);
-            
-            /* Make meshes from contours */
-            var meshes = GenerateMeshes(contours);
-
-            return (meshes, contours);
+            // return (meshes, contours);
+            return new(new List<Mesh>(), new List<Contour>());
         }
 
         /// <summary>
@@ -275,13 +243,17 @@ namespace ethanr_utils.dual_contouring.data.job_structs
                             /* Technically impossible, but is possible if we remove a duplicate vertex */
                             /* Appears in one corner */
                             /* In this case, we just know our intersection point */
-                            VoxelCells[x,y].SurfacePoints[0] = new SurfacePoint(intersectionPoints[0]);
+                            var tmp = VoxelCells[x,y];
+                            tmp.SurfacePoints[0] = SurfacePointContainer.GenerateSurfacePoint(intersectionPoints[0]);
+                            VoxelCells[x,y] = tmp;
                             break;
                         case 2:
                             /* Single point in this cell, normal case */
                             var avg = intersectionPoints[0] + intersectionPoints[1];
                             avg /= 2.0f;
-                            VoxelCells[x, y].SurfacePoints[0] = new SurfacePoint(avg);
+                            tmp = VoxelCells[x,y];
+                            tmp.SurfacePoints[0] = SurfacePointContainer.GenerateSurfacePoint(avg);
+                            VoxelCells[x,y] = tmp;
                             break;
                         case 4:
                             /* Saddle point, arbitrarily resolve */
@@ -289,8 +261,11 @@ namespace ethanr_utils.dual_contouring.data.job_structs
                             var bl = (intersectionPoints[(int)VoxelEdgeDirection.Bottom] + intersectionPoints[(int)VoxelEdgeDirection.Left]) / 2.0f;
                             var tr = (intersectionPoints[(int)VoxelEdgeDirection.Top] + intersectionPoints[(int)VoxelEdgeDirection.Right]) / 2.0f;
 
-                            VoxelCells[x, y].SurfacePoints[0] = new SurfacePoint(bl);
-                            VoxelCells[x, y].SurfacePoints[1] = new SurfacePoint(tr);
+                            tmp = VoxelCells[x,y];
+                            tmp.SurfacePoints[0] = SurfacePointContainer.GenerateSurfacePoint(bl);
+                            tmp.SurfacePoints[1] = SurfacePointContainer.GenerateSurfacePoint(tr);
+                            VoxelCells[x,y] = tmp;
+                            
                             break;
                         default:
                             /* Something WEIRD is happening */
@@ -311,7 +286,7 @@ namespace ethanr_utils.dual_contouring.data.job_structs
                 for (int y = 0; y < Size.y; y++)
                 {
                     /* Only process this cell if it has a surface point */
-                    if (VoxelCells[x, y].SurfacePoints[0] == null) continue;
+                    if (VoxelCells[x, y].GetSurfacePointCount() <= 0) continue;
                     
                     /* Connect this point to any neighbors via intersection edges */
                     foreach (var direction in VoxelEdgeDirectionExtensions.GetAll())
@@ -324,142 +299,67 @@ namespace ethanr_utils.dual_contouring.data.job_structs
                         {
                             /* Connect the surface points */
                             /* Four possible cases because of saddle points */
-                            if (VoxelCells[x, y].SurfacePoints[1] == null)
+                            if (VoxelCells[x, y].GetSurfacePointCount() == 1)
                             {
                                 /* This cell has one surface point */
-                                if (neighbor.SurfacePoints[1] == null)
+                                if (neighbor.GetSurfacePointCount() == 1)
                                 {
                                     /* Neighbor has one surface point */
-                                    VoxelCells[x,y].SurfacePoints[0].Adjacent.Add(neighbor.SurfacePoints[0]);
+                                    SurfacePointContainer.MakeAdjacent(VoxelCells[x,y].SurfacePoints[0], neighbor.SurfacePoints[0]);
                                 }
                                 else
                                 {
                                     /* Neighbor has two surface points (Saddle) */
-                                    VoxelCells[x,y].SurfacePoints[0].Adjacent.Add(neighbor.SurfacePoints[
-                                        direction is VoxelEdgeDirection.Left or VoxelEdgeDirection.Bottom ? 1 : 0]);
+                                    int a = VoxelCells[x,y].SurfacePoints[0];
+                                    int b = neighbor.SurfacePoints[
+                                                direction is VoxelEdgeDirection.Left or VoxelEdgeDirection.Bottom ? 1 : 0];
+                                    SurfacePointContainer.MakeAdjacent(a, b);
                                 }
                             }
                             else
                             {
                                 /* This cell has two surface points (Saddle) */
-                                if (neighbor.SurfacePoints[1] == null)
+                                if (neighbor.GetSurfacePointCount() == 1)
                                 {
                                     /* Neighbor has one surface point */
-                                    VoxelCells[x,y].SurfacePoints[direction is VoxelEdgeDirection.Left or VoxelEdgeDirection.Bottom ? 0 : 1]
-                                        .Adjacent.Add(neighbor.SurfacePoints[0]);
+                                    int a = VoxelCells[x,y].SurfacePoints[direction is VoxelEdgeDirection.Left or VoxelEdgeDirection.Bottom ? 0 : 1];
+                                    int b = neighbor.SurfacePoints[0];
+                                    SurfacePointContainer.MakeAdjacent(a, b);
                                 }
                                 else
                                 {
                                     /* Neighbor has two surface points (Saddle) */
-                                    VoxelCells[x,y].SurfacePoints[direction is VoxelEdgeDirection.Left or VoxelEdgeDirection.Bottom ? 0 : 1]
-                                        .Adjacent.Add(neighbor.SurfacePoints[direction is VoxelEdgeDirection.Left or VoxelEdgeDirection.Bottom ? 1 : 0]);
+                                    int a = VoxelCells[x,y].SurfacePoints[direction is VoxelEdgeDirection.Left or VoxelEdgeDirection.Bottom ? 0 : 1];
+                                    int b = neighbor.SurfacePoints[direction is VoxelEdgeDirection.Left or VoxelEdgeDirection.Bottom ? 1 : 0];
+                                    SurfacePointContainer.MakeAdjacent(a, b);
                                 }
                             }
                         }
                         else
                         {
                             /* This is a border with an edge point. Take note. */
-                            var borderPoint = new SurfacePoint()
-                            {
-                                // ReSharper disable once PossibleInvalidOperationException (THIS IS OK!)
-                                Position = VoxelCells[x, y].GetEdge(this, direction).EdgeIntersection.Value,
-                                SurfaceID = 0,
-                                Adjacent = new List<SurfacePoint>()
-                            };
-                            borderContainer.AddBorder(borderPoint, sdf.SampleNormal(borderPoint.Position), direction);
+                            // ReSharper disable once PossibleInvalidOperationException (THIS IS OK!)
+                            var borderPoint =
+                                SurfacePointContainer.GenerateSurfacePoint(VoxelCells[x, y].GetEdge(this, direction)
+                                    .EdgeIntersection.Value);
+                            borderContainer.AddBorder(borderPoint, direction);
                             
                             /* Don't forget to link to neighbors too */
-                            if (VoxelCells[x, y].SurfacePoints[1] == null)
+                            if (VoxelCells[x, y].GetSurfacePointCount() == 1)
                             {
                                 /* Only one point in this cell */
-                                borderPoint.Adjacent.Add(VoxelCells[x, y].SurfacePoints[0]);
-                                VoxelCells[x, y].SurfacePoints[0].Adjacent.Add(borderPoint);
+                                SurfacePointContainer.MakeAdjacent(VoxelCells[x, y].SurfacePoints[0], borderPoint);
                             }
                             else
                             {
                                 /* Multiple in this cell */
                                 var index = direction is VoxelEdgeDirection.Left or VoxelEdgeDirection.Bottom ? 0 : 1;
-                                borderPoint.Adjacent.Add(VoxelCells[x, y].SurfacePoints[index]);
-                                VoxelCells[x, y].SurfacePoints[index].Adjacent.Add(borderPoint);
+                                SurfacePointContainer.MakeAdjacent(VoxelCells[x, y].SurfacePoints[index], borderPoint);
                             }
                         }
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// Use a flood fill algorithm to separate connected vertices into single contours.
-        /// </summary>
-        private void FloodFillSurfaces()
-        {
-            /* No double reaching */
-            HashSet<SurfacePoint> open = new HashSet<SurfacePoint>();
-            open.AddRange(Points);
-            
-            /* Iterate until we find a starting point */
-            uint currID = 1;
-
-            while (open.Count > 0)
-            {
-                /* Find this meshes starting point */
-                SurfacePoint start = open.First();
-                
-                /* Flood fill the current mesh */
-                Queue<SurfacePoint> queue = new Queue<SurfacePoint>();
-                queue.Enqueue(start);
-                open.Remove(start);
-
-                while (queue.Count > 0)
-                {
-                    var curr = queue.Dequeue();
-                    curr.SurfaceID = currID;
-
-                    foreach (var neighbor in curr.Adjacent)
-                    {
-                        if (open.Contains(neighbor))
-                        {
-                            open.Remove(neighbor);
-                            queue.Enqueue(neighbor);
-                        }
-                    }
-                }
-                
-                /* Move on to the next mesh */
-                currID++;
-            }
-        }
-        
-        /// <summary>
-        /// Use surface IDs to generate actual ordered contours.
-        /// </summary>
-        /// <returns></returns>
-        private List<Contour> GenerateContours()
-        {
-            /* Each only belongs to one surface */
-            HashSet<SurfacePoint> open = new HashSet<SurfacePoint>();
-            open.AddRange(Points);
-            
-            var surfaces = new List<Contour>();
-            uint id = 1;    
-            
-            while (open.Count > 0)
-            {
-                var currSurface = new Contour();
-                foreach (var point in open)
-                {
-                    if (point.SurfaceID == id)
-                    {
-                        currSurface.Data.Add(point);
-                    }
-                }
-                open.RemoveWhere(s => currSurface.Data.Contains(s));
-                
-                surfaces.Add(currSurface);
-                if(open.Count > 0) id = open.First().SurfaceID;
-            }
-
-            return surfaces;
         }
         
         /// <summary>
@@ -481,7 +381,7 @@ namespace ethanr_utils.dual_contouring.data.job_structs
                     if (a == b) continue;
                     
                     /* Check confinement */
-                    if (b.ContainsPoint(a.Data[0].Position))
+                    if (b.ContainsPoint(SurfacePointContainer.Points[a.Data[0]].Position, SurfacePointContainer))
                     {
                         containment[a].Add(b);
                     }
@@ -566,13 +466,13 @@ namespace ethanr_utils.dual_contouring.data.job_structs
             {
                 /* Generate a parent polygon */
                 var tripoly = new Polygon();
-                var vertices = GenerateVertices(contour);
+                var vertices = GenerateVertices(contour, SurfacePointContainer);
                 tripoly.Add(new TriangleNet.Geometry.Contour(vertices));
                 
                 /* Add any holes */
                 foreach (var hole in contour.Holes)
                 {
-                    var holeVerts = GenerateVertices(hole);
+                    var holeVerts = GenerateVertices(hole, SurfacePointContainer);
                     tripoly.Add(new TriangleNet.Geometry.Contour(holeVerts), true);
                 }
                 
@@ -597,16 +497,25 @@ namespace ethanr_utils.dual_contouring.data.job_structs
         /// </summary>
         /// <param name="contour"></param>
         /// <returns></returns>
-        private static List<Vertex> GenerateVertices(Contour contour)
+        private static List<Vertex> GenerateVertices(Contour contour, SurfacePointContainer points)
         {
             List<Vertex> vertices = new List<Vertex>();
 
             foreach (var contourPoint in contour.Data)
             {
-                vertices.Add(new Vertex(contourPoint.Position.x, contourPoint.Position.y));
+                vertices.Add(new Vertex(points.Points[contourPoint].Position.x, points.Points[contourPoint].Position.y));
             }
             
             return vertices;
+        }
+
+        /// <summary>
+        /// Dispose of this data.
+        /// </summary>
+        public void Dispose()
+        {
+            VoxelCells.Dispose();
+            SurfacePointContainer.Dispose();
         }
     }
 }

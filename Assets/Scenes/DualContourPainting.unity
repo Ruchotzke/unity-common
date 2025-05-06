@@ -285,7 +285,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b9fefa2227af48ceb1f6b5726921047f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  VoxelsPerUnit: 6
+  VoxelsPerUnit: 2
   Area:
     serializedVersion: 2
     x: 0.01

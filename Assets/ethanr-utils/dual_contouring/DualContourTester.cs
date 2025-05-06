@@ -48,18 +48,18 @@ namespace ethanr_utils.dual_contouring
             // var torus = new DifferenceSdf(largerCircle, smallerCircle);
             // obj = new SdfObject(torus);
             
-            var largerCircle = new CircleSdf(1.5f);
-            var smallerCircle = new CircleSdf(1f);
-            var evenSmallerCircle = new CircleSdf(0.6f);
-            var theSmallestCircle = new CircleSdf(0.3f);
-            var torus = new DifferenceSdf(largerCircle, smallerCircle);
-            var innerTorus = new DifferenceSdf(evenSmallerCircle, theSmallestCircle);
-            obj = new SdfObject(new UnionSdf(torus, innerTorus));
+            // var largerCircle = new CircleSdf(1.5f);
+            // var smallerCircle = new CircleSdf(1f);
+            // var evenSmallerCircle = new CircleSdf(0.6f);
+            // var theSmallestCircle = new CircleSdf(0.3f);
+            // var torus = new DifferenceSdf(largerCircle, smallerCircle);
+            // var innerTorus = new DifferenceSdf(evenSmallerCircle, theSmallestCircle);
+            // obj = new SdfObject(new UnionSdf(torus, innerTorus));
             
-            // var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
-            // var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
-            // var union = new UnionSdf(r1, r2);
-            // obj = new SdfObject(union);
+            var r1 = new RectSdf(new Vector2(2.0f, 1.0f));
+            var r2 = new RectSdf(new Vector2(1.0f, 2.0f));
+            var union = new UnionSdf(r1, r2);
+            obj = new SdfObject(union);
 
             // var rect = new RectSdf(new Vector2(3.0f, 2.0f));
             // var rectObj = new SdfObject(rect);
@@ -95,7 +95,8 @@ namespace ethanr_utils.dual_contouring
                 // chunk.Sample(obj);
                 // evaluator.EvaluateAgainst(chunk, trans);
             }
-            
+
+            voxelData?.Dispose();
             voxelData = new VoxelDataContainer(Vector2Int.one * size, area);
             
             /* Remove the old meshes */
@@ -144,7 +145,7 @@ namespace ethanr_utils.dual_contouring
                     if (RenderSurfacePoints)
                     {
                         Gizmos.color = Color.cyan;
-                        foreach (var point in voxelData.Points)
+                        foreach (var point in voxelData.SurfacePointContainer.Points)
                         {
                             Gizmos.DrawSphere(point.Position, 0.02f);
                         }
@@ -154,14 +155,29 @@ namespace ethanr_utils.dual_contouring
                     if (RenderContours)
                     {
                         Gizmos.color = Color.yellow;
-                        foreach (var contour in contours)
+                        for (int i = 0; i < voxelData.SurfacePointContainer.PointCount; i++)
                         {
-                            for (int i = 0; i < contour.Data.Count - 1; i++)
+                            /* Get the initial position */
+                            var initPos = voxelData.SurfacePointContainer.Points[i];
+                            
+                            /* Draw lines to all adj */
+                            foreach (var adjIndex in voxelData.SurfacePointContainer.GetAdjacent(i))
                             {
-                                Gizmos.DrawLine(contour.Data[i].Position, contour.Data[i + 1].Position);
+                                /* Get second position */
+                                var secondPos = voxelData.SurfacePointContainer.Points[adjIndex];
+                                
+                                /* Draw Edge */
+                                Gizmos.DrawLine(initPos.Position, secondPos.Position);
                             }
-                            Gizmos.DrawLine(contour.Data[^1].Position, contour.Data[0].Position);
                         }
+                        // foreach (var contour in contours)
+                        // {
+                        //     for (int i = 0; i < contour.Data.Count - 1; i++)
+                        //     {
+                        //         Gizmos.DrawLine(contour.Data[i].Position, contour.Data[i + 1].Position);
+                        //     }
+                        //     Gizmos.DrawLine(contour.Data[^1].Position, contour.Data[0].Position);
+                        // }
                     }
                 }
             }

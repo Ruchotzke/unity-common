@@ -66,5 +66,13 @@ namespace ethanr_utils.jobs
         {
             return GetEnumerator();
         }
+
+        /// <summary>
+        /// Dispose of this data.
+        /// </summary>
+        public void Dispose()
+        {
+            Data.Dispose();
+        }
     }
 }

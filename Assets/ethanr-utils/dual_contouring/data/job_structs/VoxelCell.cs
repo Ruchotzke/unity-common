@@ -1,4 +1,5 @@
 using System;
+using Unity.Collections;
 using UnityEngine;
 
 namespace ethanr_utils.dual_contouring.data.job_structs
@@ -16,7 +17,7 @@ namespace ethanr_utils.dual_contouring.data.job_structs
         /// <summary>
         /// The surface points contained within this cell.
         /// </summary>
-        public SurfacePoint[] SurfacePoints;
+        public NativeArray<int> SurfacePoints;
 
         /// <summary>
         /// Construct a new, empty voxel cell.
@@ -25,7 +26,7 @@ namespace ethanr_utils.dual_contouring.data.job_structs
         public VoxelCell(Vector2Int position)
         {
             Position = position;
-            SurfacePoints = new SurfacePoint[2]; //support at most 2.
+            SurfacePoints = new NativeArray<int>(2, Allocator.Domain); //support at most 2.
         }
 
         /// <summary>
@@ -136,12 +137,25 @@ namespace ethanr_utils.dual_contouring.data.job_structs
             }
         }
 
+        /// <summary>
+        /// Get the number of surface points this cell currently contains.
+        /// </summary>
+        /// <returns></returns>
+        public int GetSurfacePointCount()
+        {
+            int count = 0;
+            if (SurfacePoints[0] >= 0) count += 1;
+            if(SurfacePoints[1] >= 0) count += 1;
+
+            return count;
+        }
+
         public override string ToString()
         {
             var sf = "";
             foreach (var point in SurfacePoints)
             {
-                if (point != null)
+                if (point >= 0)
                 {
                     sf += point.ToString() + ", ";
                 }

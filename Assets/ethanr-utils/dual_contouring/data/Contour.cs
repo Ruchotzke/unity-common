@@ -11,9 +11,9 @@ namespace ethanr_utils.dual_contouring.data
     public class Contour
     {
         /// <summary>
-        /// The data contained within this contour
+        /// The data contained within this contour (references to indices)
         /// </summary>
-        public List<SurfacePoint> Data = new();
+        public List<int> Data = new();
 
         /// <summary>
         /// Any contours which represent holes in this one
@@ -28,12 +28,12 @@ namespace ethanr_utils.dual_contouring.data
         /// <summary>
         /// Arrange the various points within this contour into order.
         /// </summary>
-        public void AssembleContour(SdfOperator sdf)
+        public void AssembleContour(SdfOperator sdf, SurfacePointContainer points)
         {
-            List<SurfacePoint> polygon = new List<SurfacePoint>();
+            List<int> polygon = new List<int>();
 
             /* Use BFS to build an ordered loop */
-            Queue<SurfacePoint> queue = new Queue<SurfacePoint>();
+            Queue<int> queue = new Queue<int>();
             queue.Enqueue(Data[0]);
             Data.RemoveAt(0);
 
@@ -44,7 +44,7 @@ namespace ethanr_utils.dual_contouring.data
                 var curr = queue.Dequeue();
                 
                 /* Add neighbors if they haven't been added yet */
-                foreach (var neighbor in curr.Adjacent)
+                foreach (var neighbor in points.GetAdjacent(curr))
                 {
                     if (!Data.Contains(neighbor)) continue;
                     queue.Enqueue(neighbor);
@@ -58,11 +58,11 @@ namespace ethanr_utils.dual_contouring.data
                 }
                 else
                 {
-                    if (polygon[0].Adjacent.Contains(curr)) // first entry
+                    if (points.GetAdjacent(polygon[0], curr)) // first entry
                     {
                         polygon.Insert(0, curr);
                     }
-                    else if (polygon[^1].Adjacent.Contains(curr)) // insertion entry
+                    else if (points.GetAdjacent(polygon[^1], curr)) // insertion entry
                     {
                         polygon.Add(curr);
                     }
@@ -83,7 +83,7 @@ namespace ethanr_utils.dual_contouring.data
             /* Make sure the winding order is correct with respect to the normals */
             if (polygon.Count > 2)
             {
-                if (!DoesOrderWindClockwise(polygon[1], sdf.SampleNormal(polygon[1].Position), polygon[2]))
+                if (!DoesOrderWindClockwise(points.Points[polygon[1]].Position, sdf.SampleNormal(points.Points[polygon[1]].Position), points.Points[polygon[2]].Position))
                 {
                     /* NOT CLOCKWISE WRT NORMAL */
                     /* Flip this polygon */
@@ -93,63 +93,6 @@ namespace ethanr_utils.dual_contouring.data
             
             Data = polygon;
         }
-
-        /// <summary>
-        /// Determine if this is a hole or outer polygon using winding order.
-        /// </summary>
-        /// <returns></returns>
-        public bool IsInnerContour()
-        {
-            /* Sample the first three points to determine winding */
-            return !DoesOrderWindClockwise(Data[0], Data[1], Data[2]);
-        }
-
-        /// <summary>
-        /// Get the box bounding this contour.
-        /// </summary>
-        /// <returns></returns>
-        public Rect GetBoundingBox()
-        {
-            Vector2 min = Data[0].Position;
-            Vector2 max = Data[0].Position;
-
-            foreach (var point in Data)
-            {
-                if(point.Position.x < min.x) min.x = point.Position.x;
-                if(point.Position.y < min.y) min.y = point.Position.y;
-                if(point.Position.x > max.x) max.x = point.Position.x;
-                if(point.Position.y > max.y) max.y = point.Position.y;
-            }
-            
-            return new Rect(min, max - min);
-        }
-
-        /// <summary>
-        /// Determine whether this contour is ordered clockwise.
-        /// </summary>
-        /// <returns></returns>
-        public bool OrderIsClockwise()
-        {
-            return SignedArea.ComputeSignedArea(this) < 0;
-        }
-        
-        /// <summary>
-        /// Check the ordering from a to b with respect to the normal.
-        /// Returns true if this will build a clockwise ordering.
-        /// </summary>
-        /// <param name="a"></param>
-        /// <param name="aNorm"></param>
-        /// <param name="b"></param>
-        /// <returns></returns>
-        private static bool DoesOrderWindClockwise(SurfacePoint a, Vector2 aNorm, SurfacePoint b)
-        {
-            var n = a.Position + aNorm;
-            
-            /* We now have a->n->b */
-            var area = ((a.Position.x * (n.y - b.Position.y)) + (n.x * (b.Position.y - a.Position.y)) + (b.Position.x * (a.Position.y - n.y)));
-
-            return area < 0;
-        }
         
         /// <summary>
         /// Check the ordering of triangle ABC
@@ -158,10 +101,10 @@ namespace ethanr_utils.dual_contouring.data
         /// <param name="b"></param>
         /// <param name="c"></param>
         /// <returns></returns>
-        private static bool DoesOrderWindClockwise(SurfacePoint a, SurfacePoint b, SurfacePoint c)
+        private static bool DoesOrderWindClockwise(Vector2 a, Vector2 b, Vector2 c)
         {
             /* We now have a->b->c */
-            var area = ((a.Position.x * (b.Position.y - c.Position.y)) + (b.Position.x * (c.Position.y - a.Position.y)) + (c.Position.x * (a.Position.y - b.Position.y)));
+            var area = ((a.x * (b.y - c.y)) + (b.x * (c.y - a.y)) + (c.x * (a.y - b.y)));
 
             return area < 0;
         }
@@ -171,14 +114,14 @@ namespace ethanr_utils.dual_contouring.data
         /// </summary>
         /// <param name="point"></param>
         /// <returns></returns>
-        public bool ContainsPoint(Vector2 point)
+        public bool ContainsPoint(Vector2 point, SurfacePointContainer points)
         {
             /* Check each edge: we're raycasting to the right. */
             var intersections = 0;
             for (var i = 0; i < Data.Count - 1; i++)
             {
-                var a = Data[i].Position;
-                var b = Data[i + 1].Position;
+                var a = points.Points[Data[i]].Position;
+                var b = points.Points[Data[i + 1]].Position;
                 
                 // Check if the horizontal ray from point intersects edge (v1,v2)
                 var cond1 = (a.y > point.y) != (b.y > point.y);
@@ -191,8 +134,8 @@ namespace ethanr_utils.dual_contouring.data
             }
             
             /* And the final edge */
-            var aa = Data[^1].Position;
-            var bb = Data[0].Position;
+            var aa = points.Points[Data[^1]].Position;
+            var bb = points.Points[Data[0]].Position;
             var cond11 = (aa.y > point.y) != (bb.y > point.y);
             if (cond11)
             {
@@ -213,17 +156,6 @@ namespace ethanr_utils.dual_contouring.data
         public int GetDepth()
         {
             return Parent == null ? 0 : Parent.GetDepth() + 1;
-        }
-
-        public string DumpPoints()
-        {
-            var ret = "";
-            foreach (var point in Data)
-            {
-                ret += $"({point.Position.x}, {point.Position.y})\n";
-            }
-
-            return ret;
         }
     }
 }
