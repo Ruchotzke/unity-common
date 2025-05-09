@@ -25,7 +25,7 @@ namespace ethanr_utils.dual_contouring.sdf
         /// </summary>
         public Vector2 Position
         {
-            get => transform.GetT();
+            get => transform.GetPosition();
             set => transform = Matrix4x4.TRS(value, Quaternion.Euler(0.0f, 0.0f, Rotation), Vector3.one * Scale);
         }
 
@@ -34,7 +34,7 @@ namespace ethanr_utils.dual_contouring.sdf
         /// </summary>
         public float Rotation
         {
-            get => transform.GetR().eulerAngles.z;
+            get => transform.rotation.eulerAngles.z;
             set => transform = Matrix4x4.TRS(Position, Quaternion.Euler(0.0f, 0.0f, value), Vector3.one * Scale);
         }
 
@@ -43,7 +43,7 @@ namespace ethanr_utils.dual_contouring.sdf
         /// </summary>
         public float Scale
         {
-            get => transform.GetS().x;
+            get => transform.lossyScale.x;
             set => transform = Matrix4x4.TRS(Position, Quaternion.Euler(0.0f, 0.0f, Rotation), Vector3.one * value);
         }
 
